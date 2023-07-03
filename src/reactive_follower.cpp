@@ -48,6 +48,8 @@ ReactiveFollower::ReactiveFollower() : Node ("Follower"),  tf_buffer(get_clock()
 
 void ReactiveFollower::execute()
 {
+
+    rclcpp::Rate control_rate(20);
     while(rclcpp::ok() && m_running)
     {
         rclcpp::spin_some(shared_from_this());
@@ -65,6 +67,7 @@ void ReactiveFollower::execute()
         twist.angular.z = pid->DoUpdate(error); //rotate slower as you approach the correct direction
 
         cmdPub->publish(twist);
+        control_rate.sleep();
     }
 }
 

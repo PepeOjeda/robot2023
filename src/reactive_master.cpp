@@ -108,6 +108,7 @@ void ReactiveMaster::execute(const GoToPose::Goal& goal)
 
     pid->reset(0);
 
+    rclcpp::Rate control_rate(20);
     while(rclcpp::ok() && !(distance()< m_stoppingDistance) )
     {
         rclcpp::spin_some(shared_from_this());
@@ -131,6 +132,7 @@ void ReactiveMaster::execute(const GoToPose::Goal& goal)
         forwardMarker.points.push_back(VecToPoint(m_currentTransform.getOrigin()));
         forwardMarker.points.push_back(VecToPoint(forward+m_currentTransform.getOrigin()));
         arrowMarkerPub->publish(forwardMarker);
+        control_rate.sleep();
     }
 
     if(!rclcpp::ok())
