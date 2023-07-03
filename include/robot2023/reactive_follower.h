@@ -6,6 +6,7 @@
 #include <std_msgs/msg/bool.hpp>
 #include <robot2023/PID.h>
 #include <robot2023/BufferWrapper.h>
+#include <diagnostic_msgs/msg/key_value.hpp>
 
 class ReactiveFollower : public rclcpp::Node
 {
@@ -14,16 +15,19 @@ class ReactiveFollower : public rclcpp::Node
     ReactiveFollower();
     void execute();
     void render();
+    bool m_running;
 
     private:
     BufferWrapper tf_buffer;
     rclcpp::Publisher<Twist>::SharedPtr cmdPub;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr stopSub;
+
+    rclcpp::Subscription<diagnostic_msgs::msg::KeyValue>::SharedPtr masterPoseSub;
+    void mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr msg);
 
     std::unique_ptr<PID> pid;
-    std::string m_master_frame_id;
     std::string m_local_frame_id;
-    geometry_msgs::msg::PointStamped m_master_offset;
+    std::string m_master_loc_topic;
+    tf2::Transform m_master_offset;
 
     double m_linearSpeed;
     double m_directionTolerance;
@@ -33,6 +37,4 @@ class ReactiveFollower : public rclcpp::Node
     tf2::Vector3 m_currentTarget;
     void updateTFs();
 
-    bool m_running;
-    void stopCB(const std_msgs::msg::Bool::SharedPtr msg);
 };

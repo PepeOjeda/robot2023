@@ -7,7 +7,6 @@ class Reactive : public rclcpp::Node
 {
     public:
     std::shared_ptr<ReactiveMaster> master;
-    std::shared_ptr<ReactiveFollower> follower;
 
 
     Reactive() : Node("Reactive")
@@ -19,7 +18,6 @@ class Reactive : public rclcpp::Node
             std::bind(&Reactive::handle_accepted, this, _1)
         );
         master = std::make_shared<ReactiveMaster>();
-        follower = std::make_shared<ReactiveFollower>();
     }
 
 
@@ -46,10 +44,8 @@ class Reactive : public rclcpp::Node
     void execute()
     {
         auto handle_master = std::thread(&ReactiveMaster::execute, master, *m_activeGoal->get_goal());
-        //auto handle_follower = std::thread(&ReactiveFollower::execute, follower, *m_activeGoal->get_goal());
         
         handle_master.join();
-        //handle_follower.join();
 
         auto result =std::make_shared<GoToPose::Result>();
         m_activeGoal->succeed(result);
@@ -66,7 +62,6 @@ class Reactive : public rclcpp::Node
         {
             AMENT_IMGUI::StartFrame();
             master->render();
-            follower->render();
             rate.sleep();
             AMENT_IMGUI::Render();
         }

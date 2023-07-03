@@ -7,6 +7,7 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <robot2023/PID.h>
+#include <diagnostic_msgs/msg/key_value.hpp>
 
 using GoToPose = nav2_msgs::action::NavigateToPose;
 
@@ -31,6 +32,7 @@ private:
     tf2::Transform m_currentTransform;
 
     rclcpp::Publisher<Twist>::SharedPtr cmdPub;
+    rclcpp::Publisher<diagnostic_msgs::msg::KeyValue>::SharedPtr runningPub;
     rclcpp::Publisher<Marker>::SharedPtr targetMarkerPub;
     rclcpp::Publisher<Marker>::SharedPtr arrowMarkerPub;
 

@@ -23,6 +23,8 @@ ReactiveMaster::ReactiveMaster() : Node("Reactive_master"), tf_buffer(get_clock(
     arrowMarkerPub = create_publisher<Marker>("master_forward", 5);
 
     pid = std::make_unique<PID>(get_clock(), 0.1, 0.1, 0.1);
+
+    runningPub = this->create_publisher<diagnostic_msgs::msg::KeyValue>("ros2mqtt", 5);
 }
 
 ReactiveMaster::~ReactiveMaster()
@@ -46,6 +48,15 @@ static geometry_msgs::msg::Point VecToPoint(const tf2::Vector3& vec)
 void ReactiveMaster::execute(const GoToPose::Goal& goal)
 {
     RCLCPP_INFO(get_logger(), "GOAL RECEIVED, STARTING REACTIVE NAVIGATION");
+    
+    //tell the follower to start
+    {
+        diagnostic_msgs::msg::KeyValue msg;
+        msg.key = "run";        
+        msg.value= R"({"run": "true"})";
+        runningPub->publish(msg);
+    }
+
     tf2::Vector3 target_position; 
     {
         geometry_msgs::msg::PoseStamped goal_map_frame = tf_buffer.buffer.transform(goal.pose, "map");
@@ -128,8 +139,13 @@ void ReactiveMaster::execute(const GoToPose::Goal& goal)
     Twist twist;
     cmdPub->publish(twist);
     
-    static rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr stopPub = create_publisher<std_msgs::msg::Bool>("/stop_reactive", 1);
-    stopPub->publish(std_msgs::msg::Bool()); 
+    //tell the follower to stop
+    {
+        diagnostic_msgs::msg::KeyValue msg;
+        msg.key = "run";
+        msg.value= R"({"run": "false"})";
+        runningPub->publish(msg);
+    }
 }
 
 

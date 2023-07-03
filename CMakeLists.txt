@@ -17,6 +17,7 @@ set(AMENT_DEPS
     nav2_msgs
     ament_imgui
     rosgraph_msgs
+    diagnostic_msgs
     )
 
 foreach(Dependency IN ITEMS ${AMENT_DEPS})
@@ -27,21 +28,27 @@ endforeach()
 
 include_directories(include)
 
+
+#test client
 add_executable(test_node src/test.cpp)
 ament_target_dependencies(test_node
 ${AMENT_DEPS}
 ) 
     
 
-
-
-add_executable(reactive src/reactive.cpp src/reactive_master.cpp src/reactive_follower.cpp)
-
-ament_target_dependencies(reactive
+#MASTER
+add_executable(reactive_master src/reactive.cpp src/reactive_master.cpp)
+ament_target_dependencies(reactive_master
 ${AMENT_DEPS}
 ) 
 
+#FOLLOWER
+add_executable(reactive_follower src/reactive_follower.cpp)
+ament_target_dependencies(reactive_follower
+${AMENT_DEPS}
+) 
 
+#CLOCK SERVER (currently unused)
 add_executable(clock_server src/clock_server.cpp)
 ament_target_dependencies(clock_server
 ${AMENT_DEPS}
@@ -49,7 +56,7 @@ ${AMENT_DEPS}
 
 
 install(
-  TARGETS test_node reactive clock_server
+  TARGETS test_node reactive_master reactive_follower clock_server
   DESTINATION lib/${PROJECT_NAME}
 )
 install(
