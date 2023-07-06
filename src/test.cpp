@@ -49,23 +49,23 @@ int main(int argc, char** argv)
 
     rclcpp::Node::SharedPtr node = std::make_shared<rclcpp::Node>("Teeeest");
     
-    auto navToPoseClient1 = rclcpp_action::create_client<NavToPose>(node, "/Robot1/navigate_to_pose");
-    auto navToPoseClient2 = rclcpp_action::create_client<NavToPose>(node, "/Robot2/navigate_to_pose");
+    auto navToPoseClientGiraff = rclcpp_action::create_client<NavToPose>(node, "/giraff/navigate_to_pose");
+    auto navToPoseClientRhodon = rclcpp_action::create_client<NavToPose>(node, "/rhodon/navigate_to_pose");
     
     auto reactiveClient = rclcpp_action::create_client<NavToPose>(node, "/Reactive/go_to_pose");
 
     using namespace std::chrono_literals;
-    while(rclcpp::ok() && !navToPoseClient1->wait_for_action_server(5s))
-            RCLCPP_INFO(node->get_logger(), "WAITING FOR NAV 1");
-    while(rclcpp::ok() && !navToPoseClient2->wait_for_action_server(5s))
-            RCLCPP_INFO(node->get_logger(), "WAITING FOR NAV 2");
+    while(rclcpp::ok() && !navToPoseClientGiraff->wait_for_action_server(5s))
+            RCLCPP_INFO(node->get_logger(), "WAITING FOR NAV GIRAFF");
+    while(rclcpp::ok() && !navToPoseClientRhodon->wait_for_action_server(5s))
+            RCLCPP_INFO(node->get_logger(), "WAITING FOR NAV RHODON");
     while(rclcpp::ok() && !reactiveClient->wait_for_action_server(5s))
             RCLCPP_INFO(node->get_logger(), "WAITING FOR REACTIVE MASTER");
 
 
     {
         using namespace std::chrono_literals;
-        while(rclcpp::ok() && !navToPoseClient1->wait_for_action_server(1s))
+        while(rclcpp::ok() && !navToPoseClientGiraff->wait_for_action_server(1s))
             RCLCPP_INFO(node->get_logger(), "WAITING");
             
         if(!rclcpp::ok())
@@ -73,17 +73,17 @@ int main(int argc, char** argv)
     }
     
     RCLCPP_WARN(node->get_logger(), "SENDING FIRST GOAL");
-    auto goal1 = sendGoal(node, navToPoseClient1, 5, 5, 0);
+    auto goal1 = sendGoal(node, navToPoseClientGiraff, 1.6, 4.7, 0);
 
 
     RCLCPP_WARN(node->get_logger(), "SENDING SECOND GOAL");
-    sendGoal(node, navToPoseClient2, 5, 3, 0);
+    sendGoal(node, navToPoseClientRhodon, 1.6, 5.7, 0);
 
-    blockUntilGoalComplete(node, navToPoseClient1, goal1);
+    blockUntilGoalComplete(node, navToPoseClientGiraff, goal1);
     RCLCPP_INFO(node->get_logger(), "GOAL DONE!");
     RCLCPP_INFO(node->get_logger(), "STARTING REACTIVE");
 
-    auto goal_reactive1 = sendGoal(node, reactiveClient, 5, 2, 0);
+    auto goal_reactive1 = sendGoal(node, reactiveClient, 2.6, 4.7, 0);
     blockUntilGoalComplete(node, reactiveClient, goal_reactive1);
     RCLCPP_INFO(node->get_logger(), "REACTIVE DONE");
 

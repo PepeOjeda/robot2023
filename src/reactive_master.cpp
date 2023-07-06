@@ -13,7 +13,7 @@ ReactiveMaster::ReactiveMaster() : Node("Reactive_master"), tf_buffer(get_clock(
 
     std::string frame_namespace = get_namespace();
     frame_namespace.erase(0, 1);
-    m_localFrame = declare_parameter<std::string>("local_frame", frame_namespace+"_base_link");
+    m_localFrame = declare_parameter<std::string>("/master/local_frame", frame_namespace+"_base_link");
     RCLCPP_INFO(get_logger(), "local frame=%s", m_localFrame.c_str());
 
     cmdPub = create_publisher<Twist>("cmd_vel", 5);
@@ -52,7 +52,7 @@ void ReactiveMaster::execute(const GoToPose::Goal& goal)
     //tell the follower to start
     {
         diagnostic_msgs::msg::KeyValue msg;
-        msg.key = "run";        
+        msg.key = "/giraff/run";
         msg.value= R"({"run": "true"})";
         runningPub->publish(msg);
     }
@@ -144,7 +144,7 @@ void ReactiveMaster::execute(const GoToPose::Goal& goal)
     //tell the follower to stop
     {
         diagnostic_msgs::msg::KeyValue msg;
-        msg.key = "run";
+        msg.key = "/giraff/run";
         msg.value= R"({"run": "false"})";
         runningPub->publish(msg);
     }

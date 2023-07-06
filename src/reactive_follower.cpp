@@ -34,7 +34,7 @@ ReactiveFollower::ReactiveFollower() : Node ("Follower"),  tf_buffer(get_clock()
 
     pid = std::make_unique<PID>(get_clock(), 0.1, 0.1, 0.1);
     m_local_frame_id = declare_parameter<std::string>("/follower/local_frame_id", "");
-    m_master_loc_topic = declare_parameter<std::string>("/follower/master_loc_topic", "rhodon");
+    m_master_loc_topic = declare_parameter<std::string>("/follower/master_loc_topic", "/rhodon/status");
 
 
     cmdPub = create_publisher<Twist>("cmd_vel", 5);
@@ -140,7 +140,7 @@ void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr ms
 
         m_currentTarget = (master_tf * m_master_offset).getOrigin();
     }
-    else if(msg->key=="run")
+    else if(msg->key=="/giraff/run")
     {
         nlohmann::json json = msg->value; 
         m_running = json["run"].get<bool>();
