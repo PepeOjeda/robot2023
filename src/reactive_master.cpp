@@ -45,7 +45,7 @@ static geometry_msgs::msg::Point VecToPoint(const tf2::Vector3& vec)
     }
 
 
-void ReactiveMaster::execute(const GoToPose::Goal& goal)
+void ReactiveMaster::execute(const geometry_msgs::msg::PoseStamped& goal_pose)
 {
     RCLCPP_INFO(get_logger(), "GOAL RECEIVED, STARTING REACTIVE NAVIGATION");
     
@@ -59,7 +59,7 @@ void ReactiveMaster::execute(const GoToPose::Goal& goal)
 
     tf2::Vector3 target_position; 
     {
-        geometry_msgs::msg::PoseStamped goal_map_frame = tf_buffer.buffer.transform(goal.pose, "map");
+        geometry_msgs::msg::PoseStamped goal_map_frame = tf_buffer.buffer.transform(goal_pose, "map");
         tf2::fromMsg(goal_map_frame.pose.position, target_position);
     }
 
@@ -70,7 +70,7 @@ void ReactiveMaster::execute(const GoToPose::Goal& goal)
         targetMarker.id=0;
         targetMarker.type = Marker::SPHERE;
 
-        targetMarker.pose = goal.pose.pose;
+        targetMarker.pose = goal_pose.pose;
 
         targetMarker.scale.x = 0.1;
         targetMarker.scale.y = 0.1;

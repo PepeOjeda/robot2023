@@ -3,7 +3,10 @@
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <ament_imgui/ament_imgui.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
+#include <diagnostic_msgs/msg/key_value.hpp>
+#include <PoseJSON.hpp>
 
+using KeyValue=diagnostic_msgs::msg::KeyValue;
 using NavToPose=nav2_msgs::action::NavigateToPose;
 
 
@@ -12,22 +15,20 @@ class Test: public rclcpp::Node
 public:
     rclcpp_action::Client<NavToPose>::SharedPtr navToPoseClient1;
     rclcpp_action::Client<NavToPose>::SharedPtr navToPoseClient2;
-    rclcpp_action::Client<NavToPose>::SharedPtr reactiveClient;
+    rclcpp::Publisher<KeyValue>::SharedPtr reactiveClient;
 
     Test() : Node("Test")
     {
         navToPoseClient1 = rclcpp_action::create_client<NavToPose>(this, "/rhodon/nav2MQTT");
         navToPoseClient2 = rclcpp_action::create_client<NavToPose>(this, "/giraff/nav2MQTT");
         
-        reactiveClient = rclcpp_action::create_client<NavToPose>(this, "/Reactive/go_to_pose");
+        reactiveClient = create_publisher<KeyValue>("/ros2mqtt", 1);
 
         using namespace std::chrono_literals;
         while(rclcpp::ok() && !navToPoseClient1->wait_for_action_server(5s))
                 RCLCPP_INFO(get_logger(), "WAITING FOR NAV 1");
         while(rclcpp::ok() && !navToPoseClient2->wait_for_action_server(5s))
                 RCLCPP_INFO(get_logger(), "WAITING FOR NAV 2");
-        while(rclcpp::ok() && !reactiveClient->wait_for_action_server(5s))
-                RCLCPP_INFO(get_logger(), "WAITING FOR REACTIVE MASTER");
     }
 
     rclcpp_action::ClientGoalHandle<NavToPose>::SharedPtr sendGoal(rclcpp_action::Client<NavToPose>::SharedPtr client, double x, double y, double z)
@@ -100,11 +101,24 @@ public:
 
         blockUntilGoalComplete(navToPoseClient1, goal1);
         RCLCPP_INFO(get_logger(), "GOAL DONE!");
-        RCLCPP_INFO(get_logger(), "STARTING REACTIVE");
 
-        auto goal_reactive1 = sendGoal(reactiveClient, 2.6, 4.7, 0);
-        blockUntilGoalComplete(reactiveClient, goal_reactive1);
-        RCLCPP_INFO(get_logger(), "REACTIVE DONE");
+
+
+        RCLCPP_INFO(get_logger(), "STARTING REACTIVE");
+        {
+            geometry_msgs::msg::PoseStamped reactiveGoal;
+            reactiveGoal.header.frame_id = "map";
+            reactiveGoal.pose.position.x = 2.6;
+            reactiveGoal.pose.position.y = 4.7;
+            reactiveGoal.pose.position.z = 0;
+
+            KeyValue msg;
+            msg.key = "/reactive";
+            msg.value = nav2MQTT::to_json(reactiveGoal);
+            reactiveClient->publish(msg);
+            //blockUntilGoalComplete(reactiveClient, goal_reactive1);
+            //RCLCPP_INFO(get_logger(), "REACTIVE DONE");
+        }
     }
 
 };

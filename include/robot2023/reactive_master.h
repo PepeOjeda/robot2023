@@ -18,7 +18,7 @@ class ReactiveMaster : public rclcpp::Node
 public:
     ReactiveMaster();
     ~ReactiveMaster();
-    void execute(const GoToPose::Goal& goal);
+    void execute(const geometry_msgs::msg::PoseStamped& goal_pose);
     void render();
 
 private:

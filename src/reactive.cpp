@@ -2,54 +2,42 @@
 #include <robot2023/reactive_follower.h>
 #include <ament_imgui/ament_imgui.h>
 #include <ament_index_cpp/get_package_share_directory.hpp>
+#include <diagnostic_msgs/msg/key_value.hpp>
+#include <PoseJSON.hpp>
+
+using KeyValue = diagnostic_msgs::msg::KeyValue;
 
 class Reactive : public rclcpp::Node
 {
     public:
     std::shared_ptr<ReactiveMaster> master;
+    rclcpp::Subscription<KeyValue>::SharedPtr mqttSub;
 
 
     Reactive() : Node("Reactive")
     {
         using namespace std::placeholders;
-        m_actionServer = rclcpp_action::create_server<GoToPose>(this, "/Reactive/go_to_pose", 
-            std::bind(&Reactive::handle_goal, this, _1, _2), 
-            std::bind(&Reactive::handle_cancel, this, _1), 
-            std::bind(&Reactive::handle_accepted, this, _1)
-        );
+        mqttSub = create_subscription<KeyValue>("/mqtt2ros", 1, std::bind(&Reactive::mqttCallback, this, std::placeholders::_1));
+        
         master = std::make_shared<ReactiveMaster>();
     }
 
-
-    rclcpp_action::Server<GoToPose>::SharedPtr m_actionServer;
-    std::shared_ptr<rclcpp_action::ServerGoalHandle<GoToPose>> m_activeGoal{nullptr};
-
-    rclcpp_action::GoalResponse handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const GoToPose::Goal> goal)
+    void mqttCallback(KeyValue::SharedPtr msg)
     {
-        return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-    }
-
-    rclcpp_action::CancelResponse handle_cancel(const std::shared_ptr<rclcpp_action::ServerGoalHandle<GoToPose>> goal_handle)
-    {
-        rclcpp::shutdown();
-        return rclcpp_action::CancelResponse::ACCEPT;
-    }
-
-    void handle_accepted(const std::shared_ptr<rclcpp_action::ServerGoalHandle<GoToPose>> goal_handle)
-    {
-        m_activeGoal = goal_handle;
+        if(msg->key == "/reactive")
+        {
+            RCLCPP_INFO(get_logger(), "Reactive goal received, starting");
+            auto json = nlohmann::json::parse(msg->value);
+            geometry_msgs::msg::PoseStamped pose = nav2MQTT::from_json(json);
+            execute(pose);
+        }
     }
 
 
-    void execute()
+    void execute(const geometry_msgs::msg::PoseStamped& goal_pose)
     {
-        auto handle_master = std::thread(&ReactiveMaster::execute, master, *m_activeGoal->get_goal());
-        
+        auto handle_master = std::thread(&ReactiveMaster::execute, master, goal_pose);
         handle_master.join();
-
-        auto result =std::make_shared<GoToPose::Result>();
-        m_activeGoal->succeed(result);
-        m_activeGoal = {nullptr};
     }
 
     void render()
@@ -80,11 +68,7 @@ int main(int argc, char** argv)
     rclcpp::Rate rate(20);
     while(rclcpp::ok())
     {
-        rclcpp::spin_some(node);
-
-        if(node->m_activeGoal.get() != nullptr)
-            node->execute();
-        
+        rclcpp::spin_some(node);        
         rate.sleep();
     }
     renderThread.join();
