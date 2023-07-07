@@ -124,21 +124,24 @@ void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr ms
         tf2::Transform master_tf;
         //parse the string
         {
-            std::array<double, 3> x_y_yaw;
-            std::stringstream s_stream(x_y_yaw_string);
-            int i = 0;
-            while(!s_stream.eof())
-            {
-                s_stream.ignore(2,' ');
-                s_stream.ignore(2,'[');
-                s_stream.ignore(2,']');
+                std::array<double, 3> x_y_yaw;
+                std::stringstream s_stream(x_y_yaw_string);
+                int i = 0;
                 
-                s_stream >> x_y_yaw[i];
-                s_stream >> std::ws; //skip whitespace
-                if(s_stream.fail())
-                    RCLCPP_ERROR(get_logger(), "ERROR PARSING THE JSON STRING: %s, \n\nPOSE SUBSTRING: %s:", msg->value.c_str(), x_y_yaw_string.c_str());
-                i++;   
-            }
+                s_stream.ignore(2,'[');
+                while(!s_stream.eof())
+                {
+                    //for debugging
+                    //std::string remaining = (s_stream.str().substr(s_stream.tellg()));
+                    
+                    s_stream >> x_y_yaw[i];
+                    s_stream.ignore(2,' ');
+                    
+                    s_stream >> std::ws; //skip whitespace
+                    if(s_stream.fail())
+                        std::cout<<"error\n";
+                    i++;   
+                }
 
             master_tf.setOrigin( {x_y_yaw[0], x_y_yaw[1], 0} );
             master_tf.setRotation( tf2::Quaternion({0,0,1}, x_y_yaw[2]) );
