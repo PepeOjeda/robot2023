@@ -116,6 +116,7 @@ void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr ms
 {
     if(msg->key==m_master_loc_topic)
     {
+        RCLCPP_INFO(get_logger(), "RECEIVED MASTER TF");
         nlohmann::json json = msg->value; 
         std::string x_y_yaw_string = json["data"]["pose"];
         
@@ -142,6 +143,7 @@ void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr ms
     }
     else if(msg->key=="/giraff/run")
     {
+        RCLCPP_INFO(get_logger(), "STARTING REACTIVE NAVIGATION");
         nlohmann::json json = msg->value; 
         m_running = json["run"].get<bool>();
     }
