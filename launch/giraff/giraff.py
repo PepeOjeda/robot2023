@@ -11,19 +11,6 @@ def generate_launch_description():
         # Set env var to print messages to stdout immediately
         SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
         
-        Node(
-            package='robot2023',
-            executable='reactive_follower',
-            name='reactive_follower',
-            namespace="giraff",
-            output='screen',
-            parameters=[
-                {"/follower/linearSpeed" : 0.3},
-                {"/follower/directionTolerance" : 0.1},
-                {"/follower/local_frame_id" : "giraff_base_link"},
-                {"/follower/master_loc_topic" : "/rhodon/status"},
-            ]  
-        ),
 
         Node(
             package='nav2_over_mqtt',

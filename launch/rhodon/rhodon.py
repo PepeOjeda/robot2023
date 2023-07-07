@@ -12,24 +12,6 @@ def generate_launch_description():
     return LaunchDescription([
         # Set env var to print messages to stdout immediately
         SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
-        
-        Node(
-            package='robot2023',
-            executable='reactive_master',
-            name='reactive_master',
-            namespace="rhodon",
-            output='screen',
-            parameters=[
-                {"/master/linearSpeed" : 0.3},
-                {"/master/stoppingDistance" : 0.3},
-                {"/master/directionTolerance" : 0.1},
-                {"/master/local_frame" : "rhodon_base_link"},
-                {"/master/directionTolerance" : 0.1},
-                {"/master/directionTolerance" : 0.1},
-                {"/master/directionTolerance" : 0.1},
-                {"/master/directionTolerance" : 0.1},
-            ]  
-        ),
 
         Node(
             package='nav2_over_mqtt',
