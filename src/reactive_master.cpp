@@ -155,7 +155,7 @@ void ReactiveMaster::updateTFs()
 {
     try
     {
-        auto geo_tf_stamped = tf_buffer.buffer.lookupTransform("map", m_localFrame, tf2_ros::fromRclcpp(now()) );
+        auto geo_tf_stamped = tf_buffer.buffer.lookupTransform("map", m_localFrame, tf2::TimePointZero );
         tf2::fromMsg(geo_tf_stamped.transform, m_currentTransform);
     }
     catch(std::exception& e)

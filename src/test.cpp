@@ -5,6 +5,7 @@
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <diagnostic_msgs/msg/key_value.hpp>
 #include <PoseJSON.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 using KeyValue=diagnostic_msgs::msg::KeyValue;
 using NavToPose=nav2_msgs::action::NavigateToPose;
@@ -38,6 +39,10 @@ public:
         goal.pose.pose.position.x = x;
         goal.pose.pose.position.y = y;
         goal.pose.pose.position.z = z;
+        
+        goal.pose.pose.orientation = tf2::toMsg(
+            tf2::Quaternion({0,0,1}, 0)
+        );
         
         rclcpp_action::ClientGoalHandle<NavToPose>::SharedPtr goal_handle{nullptr};
         bool accepted = false;
@@ -80,9 +85,10 @@ public:
             AMENT_IMGUI::StartFrame();
             
             if(ImGui::Button("Start"))
-            {
                 run();
-            }
+            
+            if (ImGui::Button("Reactive"))
+                reactive();
 
             rate.sleep();
             AMENT_IMGUI::Render();
@@ -93,34 +99,33 @@ public:
     void run()
     {
         RCLCPP_WARN(shared_from_this()->get_logger(), "SENDING FIRST GOAL");
-        auto goal1 = sendGoal(navToPoseClient1, 1.6, 4.7, 0);
+        auto goal1 = sendGoal(navToPoseClient1, -2, 4.5, 0);
 
 
         RCLCPP_WARN(shared_from_this()->get_logger(), "SENDING SECOND GOAL");
-        sendGoal(navToPoseClient2, 1.6, 5.5, 0);
+        sendGoal(navToPoseClient2, -2, 5.5, 0);
 
-        blockUntilGoalComplete(navToPoseClient1, goal1);
         RCLCPP_INFO(get_logger(), "GOAL DONE!");
+    }
 
-
-
+    void reactive()
+    {
         RCLCPP_INFO(get_logger(), "STARTING REACTIVE");
         {
             geometry_msgs::msg::PoseStamped reactiveGoal;
             reactiveGoal.header.frame_id = "map";
-            reactiveGoal.pose.position.x = 2.6;
-            reactiveGoal.pose.position.y = 4.7;
+            reactiveGoal.pose.position.x = 1;
+            reactiveGoal.pose.position.y = 4.5;
             reactiveGoal.pose.position.z = 0;
 
             KeyValue msg;
             msg.key = "/reactive";
-            msg.value = nav2MQTT::to_json(reactiveGoal);
+            msg.value = nav2MQTT::to_json(reactiveGoal).dump();
             reactiveClient->publish(msg);
             //blockUntilGoalComplete(reactiveClient, goal_reactive1);
             //RCLCPP_INFO(get_logger(), "REACTIVE DONE");
         }
     }
-
 };
 
 
