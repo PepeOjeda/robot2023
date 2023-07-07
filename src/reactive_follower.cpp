@@ -117,8 +117,9 @@ void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr ms
     if(msg->key==m_master_loc_topic)
     {
         RCLCPP_INFO(get_logger(), "RECEIVED MASTER TF");
-        nlohmann::json json = msg->value; 
-        std::string x_y_yaw_string = json["data"]["pose"];
+        auto json =  nlohmann::json::parse(msg->value); 
+        //auto data = nlohmann::json::parse( json["data"].get<std::string>() );
+        std::string x_y_yaw_string = json["data"]["pose"].get<std::string>();
         
         tf2::Transform master_tf;
         //parse the string
@@ -128,6 +129,10 @@ void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr ms
             int i = 0;
             while(!s_stream.eof())
             {
+                s_stream.ignore(2,' ');
+                s_stream.ignore(2,'[');
+                s_stream.ignore(2,']');
+                
                 s_stream >> x_y_yaw[i];
                 s_stream >> std::ws; //skip whitespace
                 if(s_stream.fail())
