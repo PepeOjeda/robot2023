@@ -42,8 +42,8 @@ ReactiveFollower::ReactiveFollower() : Node ("Follower"),  tf_buffer(get_clock()
 
     masterPoseSub = create_subscription<diagnostic_msgs::msg::KeyValue>("/mqtt2ros", 5, std::bind(&ReactiveFollower::mqttCallback, this, std::placeholders::_1));
 
-    m_master_offset.setOrigin({0, 3, 0});
-
+    float offsetDistance = declare_parameter<float>("/follower/offsetDistance", 1);
+    m_master_offset.setOrigin({0, offsetDistance, 0});
 }
 
 void ReactiveFollower::execute()
@@ -116,32 +116,29 @@ void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr ms
 {
     if(msg->key==m_master_loc_topic)
     {
-        RCLCPP_INFO(get_logger(), "RECEIVED MASTER TF");
         auto json =  nlohmann::json::parse(msg->value); 
-        //auto data = nlohmann::json::parse( json["data"].get<std::string>() );
         std::string x_y_yaw_string = json["data"]["pose"].get<std::string>();
         
         tf2::Transform master_tf;
         //parse the string
         {
-                std::array<double, 3> x_y_yaw;
-                std::stringstream s_stream(x_y_yaw_string);
-                int i = 0;
+            std::array<double, 3> x_y_yaw;
+            std::stringstream s_stream(x_y_yaw_string);
+            int i = 0;
+            
+            s_stream.ignore(2,'[');
+            while(!s_stream.eof())
+            {
+                //for debugging
+                //std::string remaining = (s_stream.str().substr(s_stream.tellg()));
                 
-                s_stream.ignore(2,'[');
-                while(!s_stream.eof())
-                {
-                    //for debugging
-                    //std::string remaining = (s_stream.str().substr(s_stream.tellg()));
-                    
-                    s_stream >> x_y_yaw[i];
-                    s_stream.ignore(2,' ');
-                    
-                    s_stream >> std::ws; //skip whitespace
-                    if(s_stream.fail())
-                        std::cout<<"error\n";
-                    i++;   
-                }
+                s_stream >> x_y_yaw[i];
+                s_stream.ignore(2,' ');
+                
+                if(s_stream.fail())
+                    RCLCPP_ERROR(get_logger(), "ERROR PARSING THE JSON STRING: %s, \n\nPOSE SUBSTRING: %s:", msg->value.c_str(), x_y_yaw_string.c_str());
+                i++;   
+            }
 
             master_tf.setOrigin( {x_y_yaw[0], x_y_yaw[1], 0} );
             master_tf.setRotation( tf2::Quaternion({0,0,1}, x_y_yaw[2]) );
