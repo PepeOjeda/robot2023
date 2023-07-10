@@ -24,7 +24,8 @@ class ReactiveFollower : public rclcpp::Node
     rclcpp::Subscription<diagnostic_msgs::msg::KeyValue>::SharedPtr masterPoseSub;
     void mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr msg);
 
-    std::unique_ptr<PID> pid;
+    std::unique_ptr<PID> directionPID;
+    std::unique_ptr<PID> speedPID;
     std::string m_local_frame_id;
     std::string m_master_loc_topic;
     tf2::Transform m_master_offset;
