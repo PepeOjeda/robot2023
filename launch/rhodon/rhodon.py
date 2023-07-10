@@ -29,7 +29,7 @@ def generate_launch_description():
             executable='mqtt_bridge_node',
             name='mqtt_bridge',
             output='screen',
-            prefix='xterm -hold -e',
+            #prefix='xterm -hold -e',
             parameters=[
                 {"host":"150.214.109.137"},
                 {"port":8002},
@@ -38,7 +38,12 @@ def generate_launch_description():
             ]            
         ),
 
-
+        Node(
+            package="robot2023",
+            executable="test_node",
+            name="test_node",
+            output="screen"
+        ),
 
         # MAP
         ##############
@@ -49,7 +54,7 @@ def generate_launch_description():
             name="rviz2",
             arguments=['-d', os.path.join(my_dir, 'launch', 'simulation', 'robot2023.rviz')],
             output="log",
-            prefix='xterm -hold -e',
+            #prefix='xterm -hold -e',
         ),
 
         Node(
