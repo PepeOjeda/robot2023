@@ -7,6 +7,9 @@
 #include <robot2023/PID.h>
 #include <robot2023/BufferWrapper.h>
 #include <diagnostic_msgs/msg/key_value.hpp>
+#include <visualization_msgs/msg/marker.hpp>
+
+using Marker = visualization_msgs::msg::Marker;
 
 class ReactiveFollower : public rclcpp::Node
 {
@@ -20,6 +23,7 @@ class ReactiveFollower : public rclcpp::Node
     private:
     BufferWrapper tf_buffer;
     rclcpp::Publisher<Twist>::SharedPtr cmdPub;
+    rclcpp::Publisher<Marker>::SharedPtr targetMarkerPub;
 
     rclcpp::Subscription<diagnostic_msgs::msg::KeyValue>::SharedPtr masterPoseSub;
     void mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr msg);

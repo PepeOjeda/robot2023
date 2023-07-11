@@ -6,8 +6,9 @@
 #include <json.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
+static constexpr double Deg2Rad = (2*M_PI)/360;
 
-int main (int argc, char** argv)
+int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
 
@@ -15,79 +16,115 @@ int main (int argc, char** argv)
 
     std::thread renderThread(&ReactiveFollower::render, node);
 
-    rclcpp::Rate rate(10);
-    while(rclcpp::ok())
+    rclcpp::Rate rate(30);
+    while (rclcpp::ok())
     {
         rclcpp::spin_some(node);
-        if(node->m_running)
+        if (node->m_running)
             node->execute();
         rate.sleep();
     }
-
+    RCLCPP_INFO(node->get_logger(), "CLOSING NODE");
     renderThread.join();
 }
 
-ReactiveFollower::ReactiveFollower() : Node ("Follower"),  tf_buffer(get_clock())
+ReactiveFollower::ReactiveFollower() : Node("Follower"), tf_buffer(get_clock())
 {
     m_linearSpeed = declare_parameter<double>("/follower/linearSpeed", 0.3);
     m_directionTolerance = declare_parameter<double>("/follower/directionTolerance", 0.1);
 
-    directionPID = std::make_unique<PID>(get_clock(), 0.2, 0.2, 0.1);
-    speedPID = std::make_unique<PID>(get_clock(), 0.1, 0.1, 0.1);
+    directionPID = std::make_unique<PID>(get_clock(), 2, 0.3, 2);
+    speedPID = std::make_unique<PID>(get_clock(), 1, 0.2, 1);
     m_local_frame_id = declare_parameter<std::string>("/follower/local_frame_id", "");
     m_master_loc_topic = declare_parameter<std::string>("/follower/master_loc_topic", "/rhodon/status");
-
 
     cmdPub = create_publisher<Twist>("cmd_vel", 5);
     RCLCPP_INFO(get_logger(), "cmd_vel topic=%s", cmdPub->get_topic_name());
 
-    masterPoseSub = create_subscription<diagnostic_msgs::msg::KeyValue>("/mqtt2ros", 5, std::bind(&ReactiveFollower::mqttCallback, this, std::placeholders::_1));
+    masterPoseSub = create_subscription<diagnostic_msgs::msg::KeyValue>("/mqtt2ros", 10, std::bind(&ReactiveFollower::mqttCallback, this, std::placeholders::_1));
 
     float offsetDistance = declare_parameter<float>("/follower/offsetDistance", 1);
-    m_master_offset.setOrigin({0, offsetDistance, 0});
+    m_master_offset.setOrigin({0.2, offsetDistance, 0});
+
+    targetMarkerPub = create_publisher<Marker>("/follower/targetMarker", 1);
 }
 
 void ReactiveFollower::execute()
 {
+    RCLCPP_INFO(get_logger(), "RUNNING");
+    updateTFs();
+
+    Marker targetMarker;
+    {
+        targetMarker.header.frame_id="map";
+        targetMarker.action=Marker::ADD;
+        targetMarker.id=0;
+        targetMarker.type = Marker::SPHERE;
+
+
+        targetMarker.scale.x = 0.3;
+        targetMarker.scale.y = 0.3;
+        targetMarker.scale.z = 0.3;
+
+        targetMarker.color.r = 0;
+        targetMarker.color.g = 1;
+        targetMarker.color.b = 0;
+        targetMarker.color.a = 1;
+        targetMarker.lifetime.sec = 100;
+    }
+
 
     rclcpp::Rate control_rate(20);
 
     speedPID->reset(0);
     directionPID->reset(0);
-    while(rclcpp::ok() && m_running)
+    while (rclcpp::ok() && m_running)
     {
         rclcpp::spin_some(shared_from_this());
         updateTFs();
 
-        tf2::Vector3 forward = tf2::quatRotate(m_currentTransform.getRotation(), {1,0,0});
+        targetMarker.pose.position.x = m_currentTarget.x();
+        targetMarker.pose.position.y = m_currentTarget.y();
+        targetMarker.pose.position.z = m_currentTarget.z();
+        targetMarkerPub->publish(targetMarker);
+
+        tf2::Vector3 forward = tf2::quatRotate(m_currentTransform.getRotation(), {1, 0, 0});
         double directionError = signedDistanceToLine(m_currentTransform.getOrigin(), forward, m_currentTarget);
-        double distance = tf2::tf2Distance(m_currentTarget, m_currentTransform.getOrigin());
+        
+        tf2::Vector3 offset = m_currentTarget - m_currentTransform.getOrigin();
+        double distance = offset.normalized().dot(forward);
 
         Twist twist;
-        if(std::abs(directionError) < m_directionTolerance)
+        if (std::abs(directionError) < m_directionTolerance)
             twist.linear.x = speedPID->DoUpdate(distance);
         else
         {
             speedPID->reset(distance);
             twist.linear.x = 0;
         }
-            
-        twist.angular.z = directionPID->DoUpdate(directionError); //rotate slower as you approach the correct direction
+
+        twist.angular.z = directionPID->DoUpdate(directionError); // rotate slower as you approach the correct direction
 
         cmdPub->publish(twist);
         control_rate.sleep();
     }
-}
 
+    RCLCPP_INFO(get_logger(), "STOPPING");
+
+    Twist twist;
+    twist.linear.x = 0;
+    twist.angular.z = 0;
+    cmdPub->publish(twist);
+}
 
 void ReactiveFollower::updateTFs()
 {
     try
     {
-        auto geo_tf_stamped = tf_buffer.buffer.lookupTransform("map", m_local_frame_id, tf2_ros::fromRclcpp(now()) );
+        auto geo_tf_stamped = tf_buffer.buffer.lookupTransform("map", m_local_frame_id, tf2::TimePointZero);
         tf2::fromMsg(geo_tf_stamped.transform, m_currentTransform);
     }
-    catch(std::exception& e)
+    catch (std::exception &e)
     {
         RCLCPP_ERROR(get_logger(), "%s", e.what());
     }
@@ -97,26 +134,26 @@ void ReactiveFollower::render()
 {
     // may throw ament_index_cpp::PackageNotFoundError exception
     std::string package_share_directory = ament_index_cpp::get_package_share_directory("robot2023");
-    AMENT_IMGUI::setup( (package_share_directory+"/imgui.ini").c_str() );
+    AMENT_IMGUI::setup((package_share_directory + "/imgui.ini").c_str());
     rclcpp::Rate rate(30);
     while (rclcpp::ok())
     {
-        AMENT_IMGUI::StartFrame();  
-        
+        AMENT_IMGUI::StartFrame();
+
         ImGui::Begin("Direction");
         {
             ImGui::InputFloat("P", &(directionPID->kP));
             ImGui::InputFloat("I", &(directionPID->kI));
             ImGui::InputFloat("D", &(directionPID->kD));
         }
-        ImGui::End(); 
+        ImGui::End();
         ImGui::Begin("Speed");
         {
             ImGui::InputFloat("P", &(speedPID->kP));
             ImGui::InputFloat("I", &(speedPID->kI));
             ImGui::InputFloat("D", &(speedPID->kD));
         }
-        ImGui::End(); 
+        ImGui::End();
 
         AMENT_IMGUI::Render();
     }
@@ -125,44 +162,48 @@ void ReactiveFollower::render()
 
 void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr msg)
 {
-    if(msg->key==m_master_loc_topic)
+    if (msg->key == m_master_loc_topic)
     {
-        RCLCPP_INFO(get_logger(), "RECEIVED MASTER POSE");
 
-        auto json =  nlohmann::json::parse(msg->value); 
+        auto json = nlohmann::json::parse(msg->value);
         std::string x_y_yaw_string = json["data"]["pose"].get<std::string>();
-        
+
         tf2::Transform master_tf;
-        //parse the string
+        // parse the string
         {
             std::array<double, 3> x_y_yaw;
             std::stringstream s_stream(x_y_yaw_string);
             int i = 0;
-            
-            s_stream.ignore(2,'[');
-            while(!s_stream.eof())
+
+            s_stream.ignore(2, '[');
+            while (!s_stream.eof())
             {
-                //for debugging
-                //std::string remaining = (s_stream.str().substr(s_stream.tellg()));
-                
+                // for debugging
+                // std::string remaining = (s_stream.str().substr(s_stream.tellg()));
+
                 s_stream >> x_y_yaw[i];
-                s_stream.ignore(2,' ');
-                
-                if(s_stream.fail())
+                s_stream.ignore(2, ' ');
+
+                if (s_stream.fail())
+                {
                     RCLCPP_ERROR(get_logger(), "ERROR PARSING THE JSON STRING: %s, \n\nPOSE SUBSTRING: %s:", msg->value.c_str(), x_y_yaw_string.c_str());
-                i++;   
+                    return;
+                }
+                i++;
             }
 
-            master_tf.setOrigin( {x_y_yaw[0], x_y_yaw[1], 0} );
-            master_tf.setRotation( tf2::Quaternion({0,0,1}, x_y_yaw[2]) );
+            master_tf.setOrigin({x_y_yaw[0], x_y_yaw[1], 0});
+            master_tf.setRotation(tf2::Quaternion({0, 0, 1}, Deg2Rad * x_y_yaw[2]));
         }
 
         m_currentTarget = (master_tf * m_master_offset).getOrigin();
     }
-    else if(msg->key=="/giraff/run")
+    else if (msg->key == "/giraff/run")
     {
+        RCLCPP_INFO(get_logger(), "RECEIVED RUN MESSAGE");
+
         RCLCPP_INFO(get_logger(), "STARTING REACTIVE NAVIGATION");
-        nlohmann::json json = msg->value; 
+        nlohmann::json json = nlohmann::json::parse(msg->value);
         m_running = json["run"].get<bool>();
     }
 }
