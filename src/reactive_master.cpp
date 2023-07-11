@@ -17,9 +17,9 @@ ReactiveMaster::ReactiveMaster(std::shared_ptr<rclcpp::Node> n) : node(n), tf_bu
     m_localFrame = node->declare_parameter<std::string>("/master/local_frame", frame_namespace+"_base_link");
     RCLCPP_INFO(node->get_logger(), "local frame=%s", m_localFrame.c_str());
 
+    cmdPub = node->create_publisher<Twist>("cmd_vel", 5);
     RCLCPP_INFO(node->get_logger(), "cmd_vel topic=%s", cmdPub->get_topic_name());
 
-    cmdPub = node->create_publisher<Twist>("cmd_vel", 5);
     targetMarkerPub = node->create_publisher<Marker>("master_target", 5);
     arrowMarkerPub = node->create_publisher<Marker>("master_forward", 5);
     runningPub = node->create_publisher<diagnostic_msgs::msg::KeyValue>("/ros2mqtt", 5);
@@ -46,7 +46,7 @@ static geometry_msgs::msg::Point VecToPoint(const tf2::Vector3& vec)
 }
 
 
-void ReactiveMaster::execute(const geometry_msgs::msg::PoseStamped& goal_pose)
+void ReactiveMaster::run(const geometry_msgs::msg::PoseStamped& goal_pose)
 {
     RCLCPP_INFO(node->get_logger(), "GOAL RECEIVED, STARTING REACTIVE NAVIGATION");
     

@@ -21,21 +21,26 @@ class Reactive : public rclcpp::Node
         
     }
 
+    bool shouldRun = false;
+    geometry_msgs::msg::PoseStamped goal_pose;
     void mqttCallback(KeyValue::SharedPtr msg)
     {
+        RCLCPP_INFO(get_logger(), "%s", msg->value);
+    
         if(msg->key == "/reactive")
         {
             RCLCPP_INFO(get_logger(), "Reactive goal received, starting");
             auto json = nlohmann::json::parse(msg->value);
-            geometry_msgs::msg::PoseStamped pose = nav2MQTT::from_json(json);
-            execute(pose);
+            goal_pose = nav2MQTT::from_json(json);
+            shouldRun = true;
         }
     }
 
 
-    void execute(const geometry_msgs::msg::PoseStamped& goal_pose)
+    void execute()
     {
-        master->execute(goal_pose);        
+        master->run(goal_pose);    
+        shouldRun = false;    
     }
 
     void render()
@@ -67,7 +72,9 @@ int main(int argc, char** argv)
     rclcpp::Rate rate(20);
     while(rclcpp::ok())
     {
-        rclcpp::spin_some(node);        
+        rclcpp::spin_some(node);   
+        if(node->shouldRun)
+            node->execute();    
         rate.sleep();
     }
     renderThread.join();
