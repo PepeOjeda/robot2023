@@ -32,7 +32,8 @@ ReactiveFollower::ReactiveFollower() : Node ("Follower"),  tf_buffer(get_clock()
     m_linearSpeed = declare_parameter<double>("/follower/linearSpeed", 0.3);
     m_directionTolerance = declare_parameter<double>("/follower/directionTolerance", 0.1);
 
-    pid = std::make_unique<PID>(get_clock(), 0.1, 0.1, 0.1);
+    directionPID = std::make_unique<PID>(get_clock(), 0.2, 0.2, 0.1);
+    speedPID = std::make_unique<PID>(get_clock(), 0.1, 0.1, 0.1);
     m_local_frame_id = declare_parameter<std::string>("/follower/local_frame_id", "");
     m_master_loc_topic = declare_parameter<std::string>("/follower/master_loc_topic", "/rhodon/status");
 
@@ -50,21 +51,28 @@ void ReactiveFollower::execute()
 {
 
     rclcpp::Rate control_rate(20);
+
+    speedPID->reset(0);
+    directionPID->reset(0);
     while(rclcpp::ok() && m_running)
     {
         rclcpp::spin_some(shared_from_this());
         updateTFs();
 
         tf2::Vector3 forward = tf2::quatRotate(m_currentTransform.getRotation(), {1,0,0});
-        double error = signedDistanceToLine(m_currentTransform.getOrigin(), forward, m_currentTarget);
-        
+        double directionError = signedDistanceToLine(m_currentTransform.getOrigin(), forward, m_currentTarget);
+        double distance = tf2::tf2Distance(m_currentTarget, m_currentTransform.getOrigin());
+
         Twist twist;
-        if(std::abs(error) < m_directionTolerance)
-            twist.linear.x = m_linearSpeed;
+        if(std::abs(directionError) < m_directionTolerance)
+            twist.linear.x = speedPID->DoUpdate(distance);
         else
+        {
+            speedPID->reset(distance);
             twist.linear.x = 0;
+        }
             
-        twist.angular.z = pid->DoUpdate(error); //rotate slower as you approach the correct direction
+        twist.angular.z = directionPID->DoUpdate(directionError); //rotate slower as you approach the correct direction
 
         cmdPub->publish(twist);
         control_rate.sleep();
@@ -95,15 +103,18 @@ void ReactiveFollower::render()
     {
         AMENT_IMGUI::StartFrame();  
         
-        ImGui::Begin("Follower");
+        ImGui::Begin("Direction");
         {
-            ImGui::BeginChild("PID");
-            {
-                ImGui::InputFloat("P", &(pid->kP));
-                ImGui::InputFloat("I", &(pid->kI));
-                ImGui::InputFloat("D", &(pid->kD));
-            }
-            ImGui::EndChild();
+            ImGui::InputFloat("P", &(directionPID->kP));
+            ImGui::InputFloat("I", &(directionPID->kI));
+            ImGui::InputFloat("D", &(directionPID->kD));
+        }
+        ImGui::End(); 
+        ImGui::Begin("Speed");
+        {
+            ImGui::InputFloat("P", &(speedPID->kP));
+            ImGui::InputFloat("I", &(speedPID->kI));
+            ImGui::InputFloat("D", &(speedPID->kD));
         }
         ImGui::End(); 
 
@@ -116,6 +127,8 @@ void ReactiveFollower::mqttCallback(diagnostic_msgs::msg::KeyValue::SharedPtr ms
 {
     if(msg->key==m_master_loc_topic)
     {
+        RCLCPP_INFO(get_logger(), "RECEIVED MASTER POSE");
+
         auto json =  nlohmann::json::parse(msg->value); 
         std::string x_y_yaw_string = json["data"]["pose"].get<std::string>();
         
