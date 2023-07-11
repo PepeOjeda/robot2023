@@ -24,25 +24,15 @@ def generate_launch_description():
                 {"resultTopic":"/rhodon/NavigationResult"},
             ]  
         ),
-        Node(
-            package='mqtt_bridge',
-            executable='mqtt_bridge_node',
-            name='mqtt_bridge',
-            output='screen',
-            #prefix='xterm -hold -e',
-            parameters=[
-                {"host":"150.214.109.137"},
-                {"port":8002},
-                {"MQTT_namespace":"pc"},
-                {"MQTT_topics_subscribe":"/rhodon/NavigationResult"},
-            ]            
-        ),
 
         Node(
             package="robot2023",
             executable="test_node",
             name="test_node",
-            output="screen"
+            output="screen",
+            parameters=[
+                {"followerDistance":1.5},
+            ]  
         ),
 
         # MAP
