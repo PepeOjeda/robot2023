@@ -18,7 +18,7 @@ class ReactiveMaster
 public:
     ReactiveMaster(std::shared_ptr<rclcpp::Node> n);
     ~ReactiveMaster();
-    void execute(const geometry_msgs::msg::PoseStamped& goal_pose);
+    void run(const geometry_msgs::msg::PoseStamped& goal_pose);
     void render();
 
 private:
