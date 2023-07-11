@@ -19,7 +19,6 @@ class Reactive : public rclcpp::Node
         using namespace std::placeholders;
         mqttSub = create_subscription<KeyValue>("/mqtt2ros", 1, std::bind(&Reactive::mqttCallback, this, std::placeholders::_1));
         
-        master = std::make_shared<ReactiveMaster>();
     }
 
     void mqttCallback(KeyValue::SharedPtr msg)
@@ -36,8 +35,7 @@ class Reactive : public rclcpp::Node
 
     void execute(const geometry_msgs::msg::PoseStamped& goal_pose)
     {
-        auto handle_master = std::thread(&ReactiveMaster::execute, master, goal_pose);
-        handle_master.join();
+        master->execute(goal_pose);        
     }
 
     void render()
@@ -62,6 +60,7 @@ int main(int argc, char** argv)
     rclcpp::init(argc, argv);
 
     std::shared_ptr<Reactive> node = std::make_shared<Reactive>();
+    node->master = std::make_shared<ReactiveMaster>(node);
     
     std::thread renderThread(&Reactive::render, node.get());
 
