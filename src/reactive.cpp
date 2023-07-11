@@ -19,25 +19,28 @@ class Reactive : public rclcpp::Node
         using namespace std::placeholders;
         mqttSub = create_subscription<KeyValue>("/mqtt2ros", 1, std::bind(&Reactive::mqttCallback, this, std::placeholders::_1));
         
-        master = std::make_shared<ReactiveMaster>();
     }
 
+    bool shouldRun = false;
+    geometry_msgs::msg::PoseStamped goal_pose;
     void mqttCallback(KeyValue::SharedPtr msg)
     {
+        RCLCPP_INFO(get_logger(), "%s", msg->value);
+    
         if(msg->key == "/reactive")
         {
             RCLCPP_INFO(get_logger(), "Reactive goal received, starting");
             auto json = nlohmann::json::parse(msg->value);
-            geometry_msgs::msg::PoseStamped pose = nav2MQTT::from_json(json);
-            execute(pose);
+            goal_pose = nav2MQTT::from_json(json);
+            shouldRun = true;
         }
     }
 
 
-    void execute(const geometry_msgs::msg::PoseStamped& goal_pose)
+    void execute()
     {
-        auto handle_master = std::thread(&ReactiveMaster::execute, master, goal_pose);
-        handle_master.join();
+        master->run(goal_pose);    
+        shouldRun = false;    
     }
 
     void render()
@@ -62,13 +65,16 @@ int main(int argc, char** argv)
     rclcpp::init(argc, argv);
 
     std::shared_ptr<Reactive> node = std::make_shared<Reactive>();
+    node->master = std::make_shared<ReactiveMaster>(node);
     
     std::thread renderThread(&Reactive::render, node.get());
 
     rclcpp::Rate rate(20);
     while(rclcpp::ok())
     {
-        rclcpp::spin_some(node);        
+        rclcpp::spin_some(node);   
+        if(node->shouldRun)
+            node->execute();    
         rate.sleep();
     }
     renderThread.join();

@@ -4,27 +4,28 @@
 #include <ament_imgui/ament_imgui.h>
 #include <std_msgs/msg/bool.hpp>
 #include <robot2023/common.h>
+#include <json.hpp>
 
-ReactiveMaster::ReactiveMaster() : Node("Reactive_master"), tf_buffer(get_clock())
+ReactiveMaster::ReactiveMaster(std::shared_ptr<rclcpp::Node> n) : node(n), tf_buffer(node->get_clock())
 {
-    m_linearSpeed = declare_parameter<double>("/master/linearSpeed", 0.3);
-    m_stoppingDistance = declare_parameter<double>("/master/stoppingDistance", 0.3);
-    m_directionTolerance = declare_parameter<double>("/master/directionTolerance", 0.1);
+    m_linearSpeed = node->declare_parameter<double>("/master/linearSpeed", 0.3);
+    m_stoppingDistance = node->declare_parameter<double>("/master/stoppingDistance", 0.3);
+    m_directionTolerance = node->declare_parameter<double>("/master/directionTolerance", 0.1);
 
-    std::string frame_namespace = get_namespace();
+    std::string frame_namespace = node->get_namespace();
     frame_namespace.erase(0, 1);
-    m_localFrame = declare_parameter<std::string>("/master/local_frame", frame_namespace+"_base_link");
-    RCLCPP_INFO(get_logger(), "local frame=%s", m_localFrame.c_str());
+    m_localFrame = node->declare_parameter<std::string>("/master/local_frame", frame_namespace+"_base_link");
+    RCLCPP_INFO(node->get_logger(), "local frame=%s", m_localFrame.c_str());
 
-    cmdPub = create_publisher<Twist>("cmd_vel", 5);
-    RCLCPP_INFO(get_logger(), "cmd_vel topic=%s", cmdPub->get_topic_name());
+    cmdPub = node->create_publisher<Twist>("cmd_vel", 5);
+    RCLCPP_INFO(node->get_logger(), "cmd_vel topic=%s", cmdPub->get_topic_name());
 
-    targetMarkerPub = create_publisher<Marker>("master_target", 5);
-    arrowMarkerPub = create_publisher<Marker>("master_forward", 5);
+    targetMarkerPub = node->create_publisher<Marker>("master_target", 5);
+    arrowMarkerPub = node->create_publisher<Marker>("master_forward", 5);
+    runningPub = node->create_publisher<diagnostic_msgs::msg::KeyValue>("/ros2mqtt", 5);
 
-    pid = std::make_unique<PID>(get_clock(), 0.1, 0.1, 0.1);
+    pid = std::make_unique<PID>(node->get_clock(), 0.1, 0.1, 0.1);
 
-    runningPub = this->create_publisher<diagnostic_msgs::msg::KeyValue>("ros2mqtt", 5);
 }
 
 ReactiveMaster::~ReactiveMaster()
@@ -45,15 +46,18 @@ static geometry_msgs::msg::Point VecToPoint(const tf2::Vector3& vec)
 }
 
 
-void ReactiveMaster::execute(const geometry_msgs::msg::PoseStamped& goal_pose)
+void ReactiveMaster::run(const geometry_msgs::msg::PoseStamped& goal_pose)
 {
-    RCLCPP_INFO(get_logger(), "GOAL RECEIVED, STARTING REACTIVE NAVIGATION");
+    RCLCPP_INFO(node->get_logger(), "GOAL RECEIVED, STARTING REACTIVE NAVIGATION");
     
+    updateTFs();
     //tell the follower to start
     {
         diagnostic_msgs::msg::KeyValue msg;
         msg.key = "/giraff/run";
-        msg.value= R"({"run": "true"})";
+        nlohmann::json json;
+        json["run"] = true;
+        msg.value= json.dump();
         runningPub->publish(msg);
     }
 
@@ -111,7 +115,7 @@ void ReactiveMaster::execute(const geometry_msgs::msg::PoseStamped& goal_pose)
     rclcpp::Rate control_rate(20);
     while(rclcpp::ok() && !(distance()< m_stoppingDistance) )
     {
-        rclcpp::spin_some(shared_from_this());
+        rclcpp::spin_some(node);
         updateTFs();
 
         tf2::Vector3 forward = tf2::quatRotate(m_currentTransform.getRotation(), {1,0,0});
@@ -145,7 +149,9 @@ void ReactiveMaster::execute(const geometry_msgs::msg::PoseStamped& goal_pose)
     {
         diagnostic_msgs::msg::KeyValue msg;
         msg.key = "/giraff/run";
-        msg.value= R"({"run": "false"})";
+        nlohmann::json json;
+        json["run"] = false;
+        msg.value= json.dump();
         runningPub->publish(msg);
     }
 }
@@ -160,7 +166,7 @@ void ReactiveMaster::updateTFs()
     }
     catch(std::exception& e)
     {
-        RCLCPP_ERROR(get_logger(), "%s", e.what());
+        RCLCPP_ERROR(node->get_logger(), "%s", e.what());
     }
 }
 

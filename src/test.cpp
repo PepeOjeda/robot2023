@@ -139,10 +139,11 @@ public:
 
         return goal_handle;
     }
+
     void run()
     {
         RCLCPP_WARN(shared_from_this()->get_logger(), "SENDING FIRST GOAL");
-        auto goal1 = sendGoal(navToPoseClient1, m_nextPosition);
+        sendGoal(navToPoseClient1, m_nextPosition);
 
         RCLCPP_WARN(shared_from_this()->get_logger(), "SENDING SECOND GOAL");
         sendGoal(navToPoseClient2, getOffsetFromMaster(m_followerOffset));
@@ -152,6 +153,8 @@ public:
 
     void reactive()
     {
+        navToPoseClient1->async_cancel_all_goals();
+        navToPoseClient2->async_cancel_all_goals();
         RCLCPP_INFO(get_logger(), "STARTING REACTIVE");
         {
             PoseStamped reactiveGoal = getOffsetFromMaster(m_reactiveGoalOffset);

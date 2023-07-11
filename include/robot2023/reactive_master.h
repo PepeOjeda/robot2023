@@ -11,17 +11,18 @@
 
 using GoToPose = nav2_msgs::action::NavigateToPose;
 
-class ReactiveMaster : public rclcpp::Node
+class ReactiveMaster
 {
     using Twist = geometry_msgs::msg::Twist;
     using Marker = visualization_msgs::msg::Marker;
 public:
-    ReactiveMaster();
+    ReactiveMaster(std::shared_ptr<rclcpp::Node> n);
     ~ReactiveMaster();
-    void execute(const geometry_msgs::msg::PoseStamped& goal_pose);
+    void run(const geometry_msgs::msg::PoseStamped& goal_pose);
     void render();
 
 private:
+    std::shared_ptr<rclcpp::Node> node;
     BufferWrapper tf_buffer;
     std::unique_ptr<PID> pid;
 
