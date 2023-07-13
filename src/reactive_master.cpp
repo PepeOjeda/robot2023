@@ -35,16 +35,6 @@ ReactiveMaster::~ReactiveMaster()
     cmdPub->publish(twist);
 }
 
-static geometry_msgs::msg::Point VecToPoint(const tf2::Vector3& vec)
-{
-    geometry_msgs::msg::Point p;
-    p.x = vec.x();
-    p.y = vec.y();
-    p.z = vec.z();
-    
-    return p;
-}
-
 
 void ReactiveMaster::run(const geometry_msgs::msg::PoseStamped& goal_pose)
 {

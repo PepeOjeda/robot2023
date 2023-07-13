@@ -25,7 +25,7 @@ class Reactive : public rclcpp::Node
     geometry_msgs::msg::PoseStamped goal_pose;
     void mqttCallback(KeyValue::SharedPtr msg)
     {
-        RCLCPP_INFO(get_logger(), "%s", msg->value);
+        RCLCPP_INFO(get_logger(), "%s", msg->value.c_str());
     
         if(msg->key == "/reactive")
         {

@@ -18,6 +18,7 @@ set(AMENT_DEPS
     ament_imgui
     rosgraph_msgs
     diagnostic_msgs
+    olfaction_msgs
     )
 
 foreach(Dependency IN ITEMS ${AMENT_DEPS})
@@ -54,9 +55,21 @@ ament_target_dependencies(clock_server
 ${AMENT_DEPS}
 ) 
 
+#Log Measurements
+add_executable(log_measurements src/log_measurements.cpp)
+ament_target_dependencies(log_measurements
+${AMENT_DEPS}
+) 
+
+#Generate map
+add_executable(generate_map src/generate_map.cpp)
+target_include_directories(generate_map PRIVATE include/DDA/include)
+ament_target_dependencies(generate_map
+${AMENT_DEPS}
+) 
 
 install(
-  TARGETS test_node reactive_master reactive_follower clock_server
+  TARGETS test_node reactive_master reactive_follower clock_server log_measurements generate_map
   DESTINATION lib/${PROJECT_NAME}
 )
 install(
