@@ -44,12 +44,18 @@ public:
         nlohmann::json json_entry;
         
         geometry_msgs::msg::PoseStamped rhodon_pose;
+        try
         {
             tf2::Transform rhodon_tf;
             auto rhodon_tf_stamped = tf_buffer.buffer.lookupTransform("rhodon_base_link", "map", tf2::TimePointZero);
             tf2::fromMsg(rhodon_tf_stamped.transform, rhodon_tf);
             rhodon_pose.pose = transformToPose(rhodon_tf);
             rhodon_pose.header.stamp = now();
+        }
+        catch(const std::exception& e)
+        {
+            RCLCPP_ERROR(get_logger(), "%s", e.what());
+            return;
         }
         
         json_entry["rhodon"] = nav2MQTT::to_json(rhodon_pose);
