@@ -1,4 +1,5 @@
 #pragma once
+#define EIGEN_INITIALIZE_MATRICES_BY_ZERO
 #include <rclcpp/rclcpp.hpp>
 #include <eigen3/Eigen/Core>
 #include <DDA/DDA.h>
@@ -14,9 +15,11 @@ public:
     void solve();
     void getEnvironment();
     nav_msgs::msg::OccupancyGrid::SharedPtr m_map_msg{nullptr};
+    void writeHeatmap();
 private:
     int m_num_cells;
     int m_num_measurements;
+    rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr m_mapSub;
 
     Eigen::VectorXd m_concentration; //(num_cells);
     Eigen::VectorXd m_measurements; //(num_measurements);
@@ -39,6 +42,7 @@ private:
     {
         m_map_msg = msg;
     }
+
 };
 
 
