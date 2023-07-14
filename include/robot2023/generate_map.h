@@ -21,9 +21,9 @@ private:
     int m_num_measurements;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr m_mapSub;
 
-    Eigen::VectorXd m_concentration; //(num_cells);
-    Eigen::VectorXd m_measurements; //(num_measurements);
-    Eigen::MatrixXd m_lengthRayInCell; //(num_measurements, num_cells);
+    Eigen::VectorXf m_concentration; //(num_cells);
+    Eigen::VectorXf m_measurements; //(num_measurements);
+    Eigen::MatrixXf m_lengthRayInCell; //(num_measurements, num_cells);
 
     std::vector<std::vector<bool>> m_occupancy_map;
     float m_rayMarchResolution;
