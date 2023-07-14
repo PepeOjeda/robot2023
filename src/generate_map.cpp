@@ -6,6 +6,11 @@
 #include <tf2/LinearMath/Transform.h>
 #include <eigen3/Eigen/SVD>
 
+#include <opencv4/opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
+
 using PoseStamped = geometry_msgs::msg::PoseStamped;
 using TDLAS=olfaction_msgs::msg::TDLAS;
 using namespace std::chrono_literals;
@@ -21,16 +26,21 @@ static TDLAS jsonToTDLAS(const nlohmann::json& json)
 
 MapGenerator::MapGenerator() : Node("MapGenerator")
 {
+    m_mapSub = create_subscription<nav_msgs::msg::OccupancyGrid>("map", rclcpp::QoS(1).reliable().transient_local(), 
+        std::bind(&MapGenerator::mapCallback, this, std::placeholders::_1));
+
+    m_rayMarchResolution = declare_parameter<float>("rayMarchResolution", 0.05f);
 }
 
 void MapGenerator::readFile()
 {
-    std::string filepath = declare_parameter<std::string>("filepath", "measurement_log");
+    std::string filepath = declare_parameter<std::string>("filepath", "/mnt/HDD/colcon_ws/measurement_log");
     std::ifstream file(filepath);
     
     //Count the number of entries and size the matrices accordingly
     int numberOfMeasurements=0;
-    for(std::string line; std::getline(file, line);)
+    std::string line;
+    while( std::getline(file, line) )
         numberOfMeasurements++;
     
     m_measurements.resize(numberOfMeasurements);
@@ -42,7 +52,7 @@ void MapGenerator::readFile()
     file.seekg(0, std::ios::beg);
     
     int measurementIndex = 0;
-    for(std::string line; std::getline(file, line); measurementIndex++)
+    while(std::getline(file, line))
     {
         auto json = nlohmann::json::parse(line);
         tf2::Transform rhodon = poseToTransform( nav2MQTT::from_json(json["rhodon"]).pose );
@@ -57,38 +67,47 @@ void MapGenerator::readFile()
         glm::vec2 reflectorPosition = glm::fromTF( giraff.getOrigin() );
 
         runDDA(rayOrigin, rayDirection, reflectorPosition, measurementIndex);
+        measurementIndex++;
     }
+    file.close();
 }
 
 void MapGenerator::solve()
 {
-    m_concentration = m_lengthRayInCell.bdcSvd((Eigen::ComputeThinU | Eigen::ComputeThinV)).solve(m_measurements);
+    m_concentration = m_lengthRayInCell.colPivHouseholderQr().solve(m_measurements);
 }
 
 
 
 void MapGenerator::getEnvironment()
 {    
+    if(m_rayMarchResolution < m_map_msg->info.resolution)
+    {
+        RCLCPP_WARN(get_logger(), "Chosen raymarch resolution (%fm) is smaller than the resolution of the occupancy map (%fm). This can cause problems, so raymarch will happen at a %fm resolution",
+            m_rayMarchResolution, m_map_msg->info.resolution, m_map_msg->info.resolution);
+        m_rayMarchResolution = m_map_msg->info.resolution;
+    }
+
     double resoultionRatio = m_map_msg->info.resolution / m_rayMarchResolution;
-    int num_cells_x = m_map_msg->info.width * resoultionRatio;
-    int num_cells_y = m_map_msg->info.height * resoultionRatio;
+    int num_cells_x = m_map_msg->info.height * resoultionRatio;
+    int num_cells_y = m_map_msg->info.width * resoultionRatio;
     m_num_cells = num_cells_x * num_cells_y;
     
-    m_mapOrigin.x = m_map_msg->info.origin.position.x;
-    m_mapOrigin.y = m_map_msg->info.origin.position.y;
+    m_mapOrigin.y = m_map_msg->info.origin.position.x;
+    m_mapOrigin.x = m_map_msg->info.origin.position.y;
     
     m_occupancy_map.resize(num_cells_x, std::vector<bool>(num_cells_y ) );
 
 
     auto cellFree = [this, resoultionRatio](int argI, int argJ)
     {
-        int nx = m_map_msg->info.width;
+        int width = m_map_msg->info.width;
         bool cellIsFree = true;
         for(int i = argI/resoultionRatio; i<(argI+1)/resoultionRatio; i++)
         {
             for(int j = argJ/resoultionRatio; j<(argJ+1)/resoultionRatio; j++)
             {
-                int value = m_map_msg->data[i + j*nx];
+                int value = m_map_msg->data[j + i*width];
                 cellIsFree = cellIsFree &&  value == 0;
             }
         }
@@ -102,7 +121,6 @@ void MapGenerator::getEnvironment()
             m_occupancy_map[i][j] = cellFree(i,j);
         }
     }
-    
 }
 
 
@@ -128,6 +146,35 @@ void MapGenerator::runDDA(const glm::vec2& origin, const glm::vec2& direction, c
     }
 }
 
+void MapGenerator::writeHeatmap()
+{
+    cv::Mat image(cv::Size(m_occupancy_map[0].size(), m_occupancy_map.size()), CV_8UC1, cv::Scalar(0,0,0));
+    
+    for(int i = 0; i<m_occupancy_map.size(); i++)
+    {
+        for(int j=0; j<m_occupancy_map[0].size(); j++)
+        {
+            image.at<uint8_t>(i, j) = m_concentration[j + i*m_occupancy_map[0].size()];
+        }
+    }
+    cv::flip(image, image, 1);
+    cv::Mat img_color;
+    cv::applyColorMap(image, img_color, cv::COLORMAP_JET);
+
+    for(int i = 0; i<m_occupancy_map.size(); i++)
+    {
+        for(int j=0; j<m_occupancy_map[0].size(); j++)
+        {
+            if(!m_occupancy_map[i][j])
+                img_color.at<cv::Vec3b>(i, j) = cv::Vec3b(0, 0 , 0);
+        }
+    }
+
+    std::string path = "methane_map.png";
+    cv::imwrite(path, img_color);
+
+    RCLCPP_INFO(get_logger(), "MAP WAS GENERATED AT PATH: %s", path.c_str());
+}
 
 
 
@@ -146,5 +193,8 @@ int main(int argc, char** argv)
     node->getEnvironment();
     node->readFile();
     node->solve();
+    node->writeHeatmap();
+
+    rclcpp::shutdown();
     return 0;
 }

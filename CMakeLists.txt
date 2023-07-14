@@ -62,8 +62,10 @@ ${AMENT_DEPS}
 ) 
 
 #Generate map
+find_package(OpenCV REQUIRED)
 add_executable(generate_map src/generate_map.cpp)
 target_include_directories(generate_map PRIVATE include/DDA/include)
+target_link_libraries(generate_map ${OpenCV_LIBS})
 ament_target_dependencies(generate_map
 ${AMENT_DEPS}
 ) 
