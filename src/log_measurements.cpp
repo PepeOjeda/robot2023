@@ -24,7 +24,9 @@ public:
         tdlasSub = create_subscription<TDLAS>("/falcon/reading", 1, std::bind(&LogMeasurements::TDLAS_callback, this, std::placeholders::_1));
         followerPositionSub = create_subscription<KeyValue>("/mqtt2ros", 1, std::bind(&LogMeasurements::MQTT_callback, this, std::placeholders::_1));
 
-        file.open(declare_parameter<std::string>("file_path", "measurement_log"));
+        auto filepath = declare_parameter<std::string>("file_path", "measurement_log");
+        file.open(filepath);
+        RCLCPP_INFO(get_logger(), "Opened file: %s", filepath.c_str());
     }
 
     ~LogMeasurements()
@@ -63,6 +65,7 @@ public:
         json_entry["reading"] = tdlasToJson(last_tdlas_msg);
         file << json_entry.dump();
         file << "\n"; //entry delimiter for easier parsing
+        RCLCPP_INFO(get_logger(), "Entry written to file");
     }
 
     TDLAS last_tdlas_msg;
