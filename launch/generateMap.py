@@ -20,7 +20,7 @@ def generate_launch_description():
             output='screen',
             emulate_tty=True,
             parameters=[
-                {"rayMarchResolution": 0.2},
+                {"rayMarchResolution": 0.4},
             ]
         ),
 

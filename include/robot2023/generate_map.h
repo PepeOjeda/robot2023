@@ -29,7 +29,7 @@ private:
     float m_rayMarchResolution;
     glm::vec2 m_mapOrigin;
     
-    void runDDA(const glm::vec2& origin, const glm::vec2& direction, const glm::vec2& reflectorPosition, uint rowIndex);
+    void runDDA(const glm::vec2& origin, const glm::vec2& direction, const glm::vec2& reflectorPosition, uint rowIndex, int ppmxm);
 
     uint index2Dto1D(const glm::ivec2& index)
     {
