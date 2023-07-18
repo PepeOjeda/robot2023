@@ -49,7 +49,7 @@ public:
         try
         {
             tf2::Transform rhodon_tf;
-            auto rhodon_tf_stamped = tf_buffer.buffer.lookupTransform("map", "rhodon_base_link", tf2::TimePointZero);
+            auto rhodon_tf_stamped = tf_buffer.buffer.lookupTransform("map", "camera", tf2::TimePointZero);
             tf2::fromMsg(rhodon_tf_stamped.transform, rhodon_tf);
             rhodon_pose.pose = transformToPose(rhodon_tf);
             rhodon_pose.header.stamp = now();
