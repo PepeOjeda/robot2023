@@ -20,7 +20,7 @@ def generate_launch_description():
             output='screen',
             emulate_tty=True,
             parameters=[
-                {"rayMarchResolution": 0.05},
+                {"rayMarchResolution": 0.4},
             ]
         ),
 
@@ -30,7 +30,7 @@ def generate_launch_description():
             name='map_server',
             output='screen',
             parameters=[
-                {'yaml_filename' : os.path.join(my_dir, "maps", "Mapirlab", "occupancy.yaml")},
+                {'yaml_filename' : os.path.join(my_dir, "maps", "Mapirlab", "mapirlab.yaml")},
                 {'frame_id' : 'map'}
                 ],
             ),

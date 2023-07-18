@@ -5,11 +5,14 @@
 #include <olfaction_msgs/msg/tdlas.hpp>
 #include <tf2/LinearMath/Transform.h>
 #include <eigen3/Eigen/SVD>
+#include <eigen3-nnls/src/nnls.h>
 
 #include <opencv4/opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
+
+static cv::Mat rays_image;
 
 using PoseStamped = geometry_msgs::msg::PoseStamped;
 using TDLAS=olfaction_msgs::msg::TDLAS;
@@ -18,7 +21,7 @@ using namespace std::chrono_literals;
 static TDLAS jsonToTDLAS(const nlohmann::json& json)
 {
     TDLAS tdlas;
-    tdlas.average_ppmxm = json["average_ppmxm"].get<double>();
+    tdlas.average_ppmxm = (double) json["average_ppmxm"].get<int>();
     tdlas.average_absorption_strength = json["average_absorption_strength"].get<double>();
     tdlas.average_reflection_strength = json["average_reflection_strength"].get<double>();
     return tdlas;
@@ -52,6 +55,8 @@ void MapGenerator::readFile()
     file.seekg(0, std::ios::beg);
     
     int measurementIndex = 0;
+
+    rays_image.create(cv::Size(m_occupancy_map[0].size(), m_occupancy_map.size()), CV_8UC1);
     while(std::getline(file, line))
     {
         auto json = nlohmann::json::parse(line);
@@ -63,18 +68,40 @@ void MapGenerator::readFile()
 
         //fill in the cell raytracing thing
         glm::vec2 rayOrigin = glm::fromTF( rhodon.getOrigin() );
-        glm::vec2 rayDirection = glm::fromTF( tf2::quatRotate(rhodon.getRotation(), {0,1,0}) ); //TODO check this
+        glm::vec2 rayDirection = glm::fromTF( tf2::quatRotate(rhodon.getRotation(), {0,1,0}) ); 
         glm::vec2 reflectorPosition = glm::fromTF( giraff.getOrigin() );
 
-        runDDA(rayOrigin, rayDirection, reflectorPosition, measurementIndex);
+        runDDA(rayOrigin, rayDirection, reflectorPosition, measurementIndex, tdlas.average_ppmxm);
         measurementIndex++;
     }
     file.close();
+
+    for(int i = 0; i<m_occupancy_map.size(); i++)
+    {
+        for(int j=0; j<m_occupancy_map[0].size(); j++)
+        {
+            if(!m_occupancy_map[i][j])
+                rays_image.at<cv::uint8_t>(i, j) = 50;
+        }
+    }
+    cv::imwrite("rays.png", rays_image);
+    
+    std::ofstream test("lengths");
+    test<<m_lengthRayInCell;
+    test.close();
 }
 
 void MapGenerator::solve()
 {
-    m_concentration = m_lengthRayInCell.colPivHouseholderQr().solve(m_measurements);
+    //m_concentration = m_lengthRayInCell.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(m_measurements);
+    
+    //m_concentration = m_lengthRayInCell.colPivHouseholderQr().solve(m_measurements);
+
+    //m_concentration = m_lengthRayInCell.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(m_measurements);
+    
+    Eigen::NNLS<Eigen::MatrixXf> solver(m_lengthRayInCell, 10000, 0.00001);
+    solver.solve(m_measurements);
+    m_concentration = solver.x();
 }
 
 
@@ -89,12 +116,12 @@ void MapGenerator::getEnvironment()
     }
 
     double resoultionRatio = m_map_msg->info.resolution / m_rayMarchResolution;
-    int num_cells_x = m_map_msg->info.height * resoultionRatio;
-    int num_cells_y = m_map_msg->info.width * resoultionRatio;
+    int num_cells_x = m_map_msg->info.width * resoultionRatio;
+    int num_cells_y = m_map_msg->info.height * resoultionRatio;
     m_num_cells = num_cells_x * num_cells_y;
     
-    m_mapOrigin.y = m_map_msg->info.origin.position.x;
-    m_mapOrigin.x = m_map_msg->info.origin.position.y;
+    m_mapOrigin.x = m_map_msg->info.origin.position.x;
+    m_mapOrigin.y = m_map_msg->info.origin.position.y;
     
     m_occupancy_map.resize(num_cells_x, std::vector<bool>(num_cells_y ) );
 
@@ -107,7 +134,7 @@ void MapGenerator::getEnvironment()
         {
             for(int j = argJ/resoultionRatio; j<(argJ+1)/resoultionRatio; j++)
             {
-                int value = m_map_msg->data[j + i*width];
+                int value = m_map_msg->data[i + j*width];
                 cellIsFree = cellIsFree &&  value == 0;
             }
         }
@@ -124,7 +151,7 @@ void MapGenerator::getEnvironment()
 }
 
 
-void MapGenerator::runDDA(const glm::vec2& origin, const glm::vec2& direction, const glm::vec2& reflectorPosition, uint rowIndex)
+void MapGenerator::runDDA(const glm::vec2& origin, const glm::vec2& direction, const glm::vec2& reflectorPosition, uint rowIndex, int ppmxm)
 {
     constexpr float reflectorRadius = 0.26;
 
@@ -143,6 +170,8 @@ void MapGenerator::runDDA(const glm::vec2& origin, const glm::vec2& direction, c
     {
         uint columnIndex = index2Dto1D(index);
         m_lengthRayInCell(rowIndex,columnIndex) = length; 
+        uint8_t& r_image = rays_image.at<uint8_t>(index.x, index.y); 
+        r_image = std::max((double)r_image, 255 * (ppmxm/100.0));
     }
 }
 
@@ -150,14 +179,33 @@ void MapGenerator::writeHeatmap()
 {
     cv::Mat image(cv::Size(m_occupancy_map[0].size(), m_occupancy_map.size()), CV_8UC1, cv::Scalar(0,0,0));
     
-    for(int i = 0; i<m_occupancy_map.size(); i++)
     {
-        for(int j=0; j<m_occupancy_map[0].size(); j++)
+        std::ofstream csvFile("map.csv");
+        float max = 0;
+        for(int i = 0; i<m_concentration.size();i++)
+            if(m_concentration[i]>max)
+                max = m_concentration[i];
+
+        RCLCPP_INFO(get_logger(), "MAX: %f", max);
+
+        for(int i = 0; i<m_occupancy_map.size(); i++)
         {
-            image.at<uint8_t>(i, j) = m_concentration[j + i*m_occupancy_map[0].size()];
+            for(int j=0; j<m_occupancy_map[0].size(); j++)
+            {
+                float concentration = m_concentration[i + j*m_occupancy_map.size()];
+                image.at<uint8_t>(i, j) = (concentration / max) * 255;
+                csvFile << concentration << ",";
+            }
+            csvFile<<"\n";
         }
+        csvFile.close();
     }
-    cv::flip(image, image, 1);
+
+    {
+        Eigen::VectorXf residuals = m_measurements - m_lengthRayInCell * m_concentration;
+        RCLCPP_INFO(get_logger(), "Residual: %f", residuals.norm()); 
+    }
+
     cv::Mat img_color;
     cv::applyColorMap(image, img_color, cv::COLORMAP_JET);
 
