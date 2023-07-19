@@ -63,19 +63,27 @@ ${AMENT_DEPS}
 
 #Generate map
 find_package(OpenCV REQUIRED)
+find_package(fmt REQUIRED)
 add_executable(generate_map src/generate_map.cpp)
 target_include_directories(generate_map PRIVATE include/DDA/include)
-target_link_libraries(generate_map ${OpenCV_LIBS})
+target_link_libraries(generate_map ${OpenCV_LIBS} fmt)
 ament_target_dependencies(generate_map
 ${AMENT_DEPS}
 ) 
 
+#Trajectory painter
+add_executable(paint_trajectory src/paint_trajectory.cpp)
+ament_target_dependencies(paint_trajectory
+${AMENT_DEPS}
+) 
+
+
 install(
-  TARGETS test_node reactive_master reactive_follower clock_server log_measurements generate_map
+  TARGETS test_node reactive_master reactive_follower clock_server log_measurements generate_map paint_trajectory
   DESTINATION lib/${PROJECT_NAME}
 )
 install(
-  DIRECTORY launch maps
+  DIRECTORY launch maps data
   DESTINATION share/${PROJECT_NAME}
 )
 ament_package()

@@ -19,6 +19,7 @@ public:
 private:
     int m_num_cells;
     int m_num_measurements;
+    float m_lambda;
     rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr m_mapSub;
 
     Eigen::VectorXf m_concentration; //(num_cells);

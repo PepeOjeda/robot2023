@@ -11,6 +11,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
+#include <fmt/core.h>
 
 static cv::Mat rays_image;
 
@@ -33,6 +34,8 @@ MapGenerator::MapGenerator() : Node("MapGenerator")
         std::bind(&MapGenerator::mapCallback, this, std::placeholders::_1));
 
     m_rayMarchResolution = declare_parameter<float>("rayMarchResolution", 0.05f);
+    m_lambda = declare_parameter<float>("lambda", 0.01);
+
 }
 
 void MapGenerator::readFile()
@@ -49,6 +52,7 @@ void MapGenerator::readFile()
     m_measurements.resize(numberOfMeasurements);
     m_lengthRayInCell.resize(numberOfMeasurements, m_num_cells);
     m_concentration.resize(m_num_cells);
+    m_lengthRayInCell.fill(m_lambda); //prior correction
     
     //restart the ifstream
     file.clear();
@@ -56,7 +60,11 @@ void MapGenerator::readFile()
     
     int measurementIndex = 0;
 
-    rays_image.create(cv::Size(m_occupancy_map[0].size(), m_occupancy_map.size()), CV_8UC1);
+#if RAYS_IMAGE
+    rays_image.create(cv::Size(m_occupancy_map[0].size(), m_occupancy_map.size()), CV_8UC3);
+    rays_image.setTo(cv::Vec3b(255,255,255));
+#endif
+
     while(std::getline(file, line))
     {
         auto json = nlohmann::json::parse(line);
@@ -76,30 +84,22 @@ void MapGenerator::readFile()
     }
     file.close();
 
+#if RAYS_IMAGE
     for(int i = 0; i<m_occupancy_map.size(); i++)
     {
         for(int j=0; j<m_occupancy_map[0].size(); j++)
         {
             if(!m_occupancy_map[i][j])
-                rays_image.at<cv::uint8_t>(i, j) = 50;
+                rays_image.at<cv::Vec3b>(i, j) = cv::Vec3b(0,0,0);
         }
     }
-    cv::imwrite("rays.png", rays_image);
-    
-    std::ofstream test("lengths");
-    test<<m_lengthRayInCell;
-    test.close();
+    cv::imwrite("rays.png", rays_image); 
+#endif
 }
 
 void MapGenerator::solve()
 {
-    //m_concentration = m_lengthRayInCell.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(m_measurements);
-    
-    //m_concentration = m_lengthRayInCell.colPivHouseholderQr().solve(m_measurements);
-
-    //m_concentration = m_lengthRayInCell.jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(m_measurements);
-    
-    Eigen::NNLS<Eigen::MatrixXf> solver(m_lengthRayInCell, 10000, 0.00001);
+    Eigen::NNLS<Eigen::MatrixXf> solver(m_lengthRayInCell, 1000, 0.00001);
     solver.solve(m_measurements);
     m_concentration = solver.x();
 }
@@ -170,8 +170,15 @@ void MapGenerator::runDDA(const glm::vec2& origin, const glm::vec2& direction, c
     {
         uint columnIndex = index2Dto1D(index);
         m_lengthRayInCell(rowIndex,columnIndex) = length; 
-        uint8_t& r_image = rays_image.at<uint8_t>(index.x, index.y); 
-        r_image = std::max((double)r_image, 255 * (ppmxm/100.0));
+ 
+#if RAYS_IMAGE       
+        cv::Vec3b& r_image = rays_image.at<cv::Vec3b>(index.x, index.y); 
+        double previous = 255-r_image[0];
+        uint8_t value = (uint8_t) std::max(previous, 255 * (ppmxm/100.0));
+        r_image = cv::Vec3b( 255-value , 255-value, 255 );
+        
+        //r_image += length * 100;
+#endif
     }
 }
 
@@ -180,7 +187,6 @@ void MapGenerator::writeHeatmap()
     cv::Mat image(cv::Size(m_occupancy_map[0].size(), m_occupancy_map.size()), CV_8UC1, cv::Scalar(0,0,0));
     
     {
-        std::ofstream csvFile("map.csv");
         float max = 0;
         for(int i = 0; i<m_concentration.size();i++)
             if(m_concentration[i]>max)
@@ -194,11 +200,8 @@ void MapGenerator::writeHeatmap()
             {
                 float concentration = m_concentration[i + j*m_occupancy_map.size()];
                 image.at<uint8_t>(i, j) = (concentration / max) * 255;
-                csvFile << concentration << ",";
             }
-            csvFile<<"\n";
         }
-        csvFile.close();
     }
 
     {
@@ -209,16 +212,19 @@ void MapGenerator::writeHeatmap()
     cv::Mat img_color;
     cv::applyColorMap(image, img_color, cv::COLORMAP_JET);
 
-    for(int i = 0; i<m_occupancy_map.size(); i++)
+    //occupancy
     {
-        for(int j=0; j<m_occupancy_map[0].size(); j++)
+        for(int i = 0; i<m_occupancy_map.size(); i++)
         {
-            if(!m_occupancy_map[i][j])
-                img_color.at<cv::Vec3b>(i, j) = cv::Vec3b(0, 0 , 0);
+            for(int j=0; j<m_occupancy_map[0].size(); j++)
+            {
+                if(!m_occupancy_map[i][j])
+                    img_color.at<cv::Vec3b>(i, j) = cv::Vec3b(0, 0 , 0);
+            }
         }
     }
 
-    std::string path = "methane_map.png";
+    std::string path = fmt::format("{}_methane_map_{}.png", m_rayMarchResolution, m_lambda);
     cv::imwrite(path, img_color);
 
     RCLCPP_INFO(get_logger(), "MAP WAS GENERATED AT PATH: %s", path.c_str());

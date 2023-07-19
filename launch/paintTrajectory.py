@@ -13,19 +13,18 @@ def generate_launch_description():
     return LaunchDescription([
 
         SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
-
+    
         Node(
             package='robot2023',
-            executable='generate_map',
-            name='generate_map',
+            executable='paint_trajectory',
+            name='paint_trajectory',
             output='screen',
             emulate_tty=True,
             parameters=[
-                {"rayMarchResolution": 0.2},
-                {"lambda": 0.05},
-                {"filepath": os.path.join(my_dir, "data", "measurement_log1_postProcessed")},
+                {"filepath": os.path.join(my_dir, "data", "pass1")},
             ]
         ),
+
 
         Node(
             package='nav2_map_server',
@@ -50,5 +49,14 @@ def generate_launch_description():
                             ]
                         }
             ]
+        ),
+
+        Node(
+            package="rviz2",
+            executable="rviz2",
+            name="rviz2",
+            arguments=['-d', os.path.join(my_dir, 'launch', 'simulation', 'robot2023.rviz')],
+            output="log",
+            prefix='xterm -hold -e',
         ),
     ])
