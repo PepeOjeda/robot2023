@@ -12,8 +12,14 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <fmt/core.h>
+#include <filesystem>
 
+#define RAYS_IMAGE 1
+
+#if RAYS_IMAGE
 static cv::Mat rays_image;
+#endif
+static cv::Mat mask;
 
 using PoseStamped = geometry_msgs::msg::PoseStamped;
 using TDLAS=olfaction_msgs::msg::TDLAS;
@@ -35,14 +41,30 @@ MapGenerator::MapGenerator() : Node("MapGenerator")
 
     m_rayMarchResolution = declare_parameter<float>("rayMarchResolution", 0.05f);
     m_lambda = declare_parameter<float>("lambda", 0.01);
+    m_input_filepath = declare_parameter<std::string>("filepath", "/mnt/HDD/colcon_ws/measurement_log");
+    m_mask_filepath = declare_parameter<std::string>("mask_filepath", "/mnt/HDD/colcon_ws/mask.png");
 
 }
 
 void MapGenerator::readFile()
 {
-    std::string filepath = declare_parameter<std::string>("filepath", "/mnt/HDD/colcon_ws/measurement_log");
-    std::ifstream file(filepath);
+    std::ifstream file(m_input_filepath);
     
+    if(!file.is_open())
+    {
+        RCLCPP_ERROR(get_logger(), "Could not open file %s", m_input_filepath.c_str());
+        raise(SIGTRAP);
+    }
+    
+    if(std::filesystem::exists(m_mask_filepath))
+        mask=cv::imread(m_mask_filepath, cv::IMREAD_GRAYSCALE);
+    else
+    {
+        RCLCPP_ERROR(get_logger(), "Could not open mask file: %s  Using an all-ones mask", m_mask_filepath.c_str());
+        mask.create(cv::Size(m_occupancy_map[0].size(), m_occupancy_map.size()), CV_8UC1);
+        mask.setTo(255);
+    }
+
     //Count the number of entries and size the matrices accordingly
     int numberOfMeasurements=0;
     std::string line;
@@ -99,7 +121,7 @@ void MapGenerator::readFile()
 
 void MapGenerator::solve()
 {
-    Eigen::NNLS<Eigen::MatrixXf> solver(m_lengthRayInCell, 1000, 0.00001);
+    Eigen::NNLS<Eigen::MatrixXf> solver(m_lengthRayInCell, 1000, 0.000005);
     solver.solve(m_measurements);
     m_concentration = solver.x();
 }
@@ -169,15 +191,20 @@ void MapGenerator::runDDA(const glm::vec2& origin, const glm::vec2& direction, c
     for(const auto& [index, length] : rayData.lengthInCell)
     {
         uint columnIndex = index2Dto1D(index);
+        if(mask.at<uint8_t>(index.x, index.y) == 0)
+            continue;
+
         m_lengthRayInCell(rowIndex,columnIndex) = length; 
- 
+        
+
 #if RAYS_IMAGE       
         cv::Vec3b& r_image = rays_image.at<cv::Vec3b>(index.x, index.y); 
+        
         double previous = 255-r_image[0];
-        uint8_t value = (uint8_t) std::max(previous, 255 * (ppmxm/100.0));
+        uint8_t value = (uint8_t) (previous + 255 * (ppmxm/200.0));
         r_image = cv::Vec3b( 255-value , 255-value, 255 );
         
-        //r_image += length * 100;
+        //r_image += cv::Vec3b(length*100, length * 100, length * 100);
 #endif
     }
 }
@@ -186,23 +213,22 @@ void MapGenerator::writeHeatmap()
 {
     cv::Mat image(cv::Size(m_occupancy_map[0].size(), m_occupancy_map.size()), CV_8UC1, cv::Scalar(0,0,0));
     
+    float max = 0;
+    for(int i = 0; i<m_concentration.size();i++)
+        if(m_concentration[i]>max)
+            max = m_concentration[i];
+
+    RCLCPP_INFO(get_logger(), "MAX: %f", max);
+
+    for(int i = 0; i<m_occupancy_map.size(); i++)
     {
-        float max = 0;
-        for(int i = 0; i<m_concentration.size();i++)
-            if(m_concentration[i]>max)
-                max = m_concentration[i];
-
-        RCLCPP_INFO(get_logger(), "MAX: %f", max);
-
-        for(int i = 0; i<m_occupancy_map.size(); i++)
+        for(int j=0; j<m_occupancy_map[0].size(); j++)
         {
-            for(int j=0; j<m_occupancy_map[0].size(); j++)
-            {
-                float concentration = m_concentration[i + j*m_occupancy_map.size()];
-                image.at<uint8_t>(i, j) = (concentration / max) * 255;
-            }
+            float concentration = m_concentration[i + j*m_occupancy_map.size()];
+            image.at<uint8_t>(i, j) = (concentration / max) * 255;
         }
     }
+    
 
     {
         Eigen::VectorXf residuals = m_measurements - m_lengthRayInCell * m_concentration;
@@ -224,10 +250,16 @@ void MapGenerator::writeHeatmap()
         }
     }
 
-    std::string path = fmt::format("{}_methane_map_{}.png", m_rayMarchResolution, m_lambda);
-    cv::imwrite(path, img_color);
+    std::filesystem::path inputPath(m_input_filepath);
+    std::string outputPath = fmt::format("results/mask_{}_{}m_lambda-{}.png", inputPath.filename().c_str(), m_rayMarchResolution, m_lambda);
+    cv::imwrite(outputPath, img_color);
 
-    RCLCPP_INFO(get_logger(), "MAP WAS GENERATED AT PATH: %s", path.c_str());
+
+    std::ofstream scale ("results/scale.csv", std::ios::app);
+    scale<<outputPath<<"; "<<max<<"\n";
+    scale.close();
+
+    RCLCPP_INFO(get_logger(), "MAP WAS GENERATED AT PATH: %s", outputPath.c_str());
 }
 
 

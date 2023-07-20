@@ -2,7 +2,7 @@ import os
 
 from launch import LaunchDescription
 from launch.launch_description_sources import FrontendLaunchDescriptionSource, PythonLaunchDescriptionSource
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, OpaqueFunction, GroupAction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable, OpaqueFunction, Shutdown
 
 from launch_ros.actions import Node, PushRosNamespace
 from ament_index_python.packages import get_package_share_directory
@@ -21,10 +21,12 @@ def generate_launch_description():
             output='screen',
             emulate_tty=True,
             parameters=[
-                {"rayMarchResolution": 0.2},
-                {"lambda": 0.05},
+                {"rayMarchResolution": 0.4},
+                {"lambda": 0.0},
                 {"filepath": os.path.join(my_dir, "data", "measurement_log1_postProcessed")},
-            ]
+                {"mask_filepath": "/mnt/HDD/colcon_ws/mask.png"},
+            ],
+            on_exit=Shutdown()
         ),
 
         Node(

@@ -17,6 +17,8 @@ public:
     nav_msgs::msg::OccupancyGrid::SharedPtr m_map_msg{nullptr};
     void writeHeatmap();
 private:
+    std::string m_input_filepath;
+    std::string m_mask_filepath;
     int m_num_cells;
     int m_num_measurements;
     float m_lambda;
