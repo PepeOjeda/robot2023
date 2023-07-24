@@ -201,7 +201,7 @@ void MapGenerator::runDDA(const glm::vec2& origin, const glm::vec2& direction, c
         cv::Vec3b& r_image = rays_image.at<cv::Vec3b>(index.x, index.y); 
         
         double previous = 255-r_image[0];
-        uint8_t value = (uint8_t) (previous + 255 * (ppmxm/200.0));
+        uint8_t value = (uint8_t) std::max(previous , 255 * (ppmxm/100.0));
         r_image = cv::Vec3b( 255-value , 255-value, 255 );
         
         //r_image += cv::Vec3b(length*100, length * 100, length * 100);
