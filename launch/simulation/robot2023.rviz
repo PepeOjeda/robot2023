@@ -5,6 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
+        - /Map1/Topic1
         - /TDLAS1
       Splitter Ratio: 0.6309859156608582
     Tree Height: 446
@@ -34,7 +35,7 @@ Visualization Manager:
       Name: Map
       Topic:
         Depth: 5
-        Durability Policy: Volatile
+        Durability Policy: Transient Local
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
@@ -64,7 +65,7 @@ Visualization Manager:
       Enabled: true
       Name: Follower
       Namespaces:
-        "": true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -77,7 +78,7 @@ Visualization Manager:
       Enabled: true
       Name: Master
       Namespaces:
-        "": true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -90,7 +91,7 @@ Visualization Manager:
       Enabled: true
       Name: Goal
       Namespaces:
-        "": true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -98,6 +99,31 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /goal_reactive
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Giraff
+      Namespaces:
+        "": true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /giraff_marker
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: Rhodon
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /rhodon_marker
       Value: true
   Enabled: true
   Global Options:
@@ -145,16 +171,16 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 7.152623176574707
+      Distance: 27.8664493560791
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.538733720779419
-        Y: 1.2801318168640137
-        Z: -0.3147599995136261
+        X: -4.467738151550293
+        Y: 0.07293353974819183
+        Z: -0.20959843695163727
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false

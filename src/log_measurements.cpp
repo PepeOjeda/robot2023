@@ -24,7 +24,9 @@ public:
         tdlasSub = create_subscription<TDLAS>("/falcon/reading", 1, std::bind(&LogMeasurements::TDLAS_callback, this, std::placeholders::_1));
         followerPositionSub = create_subscription<KeyValue>("/mqtt2ros", 1, std::bind(&LogMeasurements::MQTT_callback, this, std::placeholders::_1));
 
-        file.open(declare_parameter<std::string>("file_path", "measurement_log"));
+        auto filepath = declare_parameter<std::string>("file_path", "measurement_log");
+        file.open(filepath);
+        RCLCPP_INFO(get_logger(), "Opened file: %s", filepath.c_str());
     }
 
     ~LogMeasurements()
@@ -44,12 +46,18 @@ public:
         nlohmann::json json_entry;
         
         geometry_msgs::msg::PoseStamped rhodon_pose;
+        try
         {
             tf2::Transform rhodon_tf;
-            auto rhodon_tf_stamped = tf_buffer.buffer.lookupTransform("rhodon_base_link", "map", tf2::TimePointZero);
+            auto rhodon_tf_stamped = tf_buffer.buffer.lookupTransform("map", "camera", tf2::TimePointZero);
             tf2::fromMsg(rhodon_tf_stamped.transform, rhodon_tf);
             rhodon_pose.pose = transformToPose(rhodon_tf);
             rhodon_pose.header.stamp = now();
+        }
+        catch(const std::exception& e)
+        {
+            RCLCPP_ERROR(get_logger(), "%s", e.what());
+            return;
         }
         
         json_entry["rhodon"] = nav2MQTT::to_json(rhodon_pose);
@@ -57,6 +65,7 @@ public:
         json_entry["reading"] = tdlasToJson(last_tdlas_msg);
         file << json_entry.dump();
         file << "\n"; //entry delimiter for easier parsing
+        RCLCPP_INFO(get_logger(), "Entry written to file");
     }
 
     TDLAS last_tdlas_msg;

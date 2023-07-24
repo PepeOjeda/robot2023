@@ -11,44 +11,20 @@ def generate_launch_description():
 
     my_dir = get_package_share_directory('robot2023')
     return LaunchDescription([
-        # Set env var to print messages to stdout immediately
+
         SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(my_dir, 'launch', 'rhodon', 'rhodon.py')
-            )
-        ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(my_dir, 'launch', 'giraff', 'giraff.py')
-            )
-        ),
-        
+    
         Node(
-            package='mqtt_bridge',
-            executable='mqtt_bridge_node',
-            name='mqtt_bridge',
+            package='robot2023',
+            executable='paint_trajectory',
+            name='paint_trajectory',
             output='screen',
-            #prefix='xterm -hold -e',
+            emulate_tty=True,
             parameters=[
-                {"host":"150.214.109.137"},
-                {"port":8002},
-                {"MQTT_namespace":"pc"},
-                {"MQTT_topics_subscribe":"/rhodon/NavigationResult,/giraff/NavigationResult"},
-            ]            
+                {"filepath": os.path.join(my_dir, "data", "pass2")},
+            ]
         ),
 
-        # MAP
-        ##############
-        
-        Node(
-            package="rviz2",
-            executable="rviz2",
-            name="rviz2",
-            arguments=['-d', os.path.join(my_dir, 'launch', 'simulation', 'robot2023.rviz')],
-            output="log",
-            #prefix='xterm -hold -e',
-        ),
 
         Node(
             package='nav2_map_server',
@@ -56,7 +32,7 @@ def generate_launch_description():
             name='map_server',
             output='screen',
             parameters=[
-                {'yaml_filename' : os.path.join(my_dir, "maps", "Mapirlab", "occupancy.yaml")},
+                {'yaml_filename' : os.path.join(my_dir, "maps", "parking.yaml")},
                 {'frame_id' : 'map'}
                 ],
             ),
@@ -75,4 +51,12 @@ def generate_launch_description():
             ]
         ),
 
+        Node(
+            package="rviz2",
+            executable="rviz2",
+            name="rviz2",
+            arguments=['-d', os.path.join(my_dir, 'launch', 'simulation', 'robot2023.rviz')],
+            output="log",
+            prefix='xterm -hold -e',
+        ),
     ])

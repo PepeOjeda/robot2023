@@ -1,4 +1,5 @@
 #pragma once
+#define EIGEN_INITIALIZE_MATRICES_BY_ZERO
 #include <rclcpp/rclcpp.hpp>
 #include <eigen3/Eigen/Core>
 #include <DDA/DDA.h>
@@ -14,19 +15,24 @@ public:
     void solve();
     void getEnvironment();
     nav_msgs::msg::OccupancyGrid::SharedPtr m_map_msg{nullptr};
+    void writeHeatmap();
 private:
+    std::string m_input_filepath;
+    std::string m_mask_filepath;
     int m_num_cells;
     int m_num_measurements;
+    float m_lambda;
+    rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr m_mapSub;
 
-    Eigen::VectorXd m_concentration; //(num_cells);
-    Eigen::VectorXd m_measurements; //(num_measurements);
-    Eigen::MatrixXd m_lengthRayInCell; //(num_measurements, num_cells);
+    Eigen::VectorXf m_concentration; //(num_cells);
+    Eigen::VectorXf m_measurements; //(num_measurements);
+    Eigen::MatrixXf m_lengthRayInCell; //(num_measurements, num_cells);
 
     std::vector<std::vector<bool>> m_occupancy_map;
     float m_rayMarchResolution;
     glm::vec2 m_mapOrigin;
     
-    void runDDA(const glm::vec2& origin, const glm::vec2& direction, const glm::vec2& reflectorPosition, uint rowIndex);
+    void runDDA(const glm::vec2& origin, const glm::vec2& direction, const glm::vec2& reflectorPosition, uint rowIndex, int ppmxm);
 
     uint index2Dto1D(const glm::ivec2& index)
     {
@@ -39,6 +45,7 @@ private:
     {
         m_map_msg = msg;
     }
+
 };
 
 
