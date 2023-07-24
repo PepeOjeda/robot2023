@@ -3,6 +3,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include <json.hpp>
 
+
+static constexpr double Deg2Rad = (2*M_PI)/360;
+
 static float signedAngle(const tf2::Vector3& v1, const tf2::Vector3& v2, const tf2::Vector3& referenceAxis)
 {
     float sign = (v1.cross(v2).dot(referenceAxis)) >0? 1 : -1;
@@ -45,7 +48,7 @@ static tf2::Transform parse_status_publisher_msg(const std::string& msg)
     }
 
     tf.setOrigin( {x_y_yaw[0], x_y_yaw[1], 0} );
-    tf.setRotation( tf2::Quaternion({0,0,1}, x_y_yaw[2]) );
+    tf.setRotation( tf2::Quaternion({0,0,1}, Deg2Rad * x_y_yaw[2]) );
     
     return tf;
 }

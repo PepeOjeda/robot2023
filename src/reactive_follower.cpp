@@ -6,7 +6,6 @@
 #include <json.hpp>
 #include <ament_index_cpp/get_package_share_directory.hpp>
 
-static constexpr double Deg2Rad = (2*M_PI)/360;
 
 int main(int argc, char **argv)
 {
